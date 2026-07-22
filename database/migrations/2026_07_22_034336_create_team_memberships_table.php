@@ -18,12 +18,12 @@ return new class extends Migration
             $table->unique(['team_id', 'membership_id']);
             $table->index('organization_id');
 
-            $table->foreign(['organization_id', 'team_id'])
+            $table->foreign(['organization_id', 'team_id'], 'team_memberships_org_team_fk')
                 ->references(['organization_id', 'id'])
                 ->on('teams')
                 ->cascadeOnDelete();
 
-            $table->foreign(['organization_id', 'membership_id'])
+            $table->foreign(['organization_id', 'membership_id'], 'team_memberships_org_membership_fk')
                 ->references(['organization_id', 'id'])
                 ->on('memberships')
                 ->cascadeOnDelete();

@@ -10,11 +10,18 @@ return new class extends Migration
     {
         Schema::create('parent_account_membership_role', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('parent_account_membership_id')
-                ->constrained('parent_account_memberships')
-                ->cascadeOnDelete();
-            $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+            $table->unsignedBigInteger('parent_account_membership_id');
+            $table->unsignedBigInteger('role_id');
             $table->timestamps();
+
+            $table->foreign('parent_account_membership_id', 'pam_role_membership_fk')
+                ->references('id')
+                ->on('parent_account_memberships')
+                ->cascadeOnDelete();
+            $table->foreign('role_id', 'pam_role_role_fk')
+                ->references('id')
+                ->on('roles')
+                ->cascadeOnDelete();
 
             $table->unique(['parent_account_membership_id', 'role_id'], 'pam_role_unique');
         });

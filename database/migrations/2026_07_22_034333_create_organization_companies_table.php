@@ -17,10 +17,7 @@ return new class extends Migration
             $table->string('relationship_status');
             $table->boolean('is_flagged')->default(false);
             $table->text('flagged_reason')->nullable();
-            $table->foreignId('sales_owner_membership_id')
-                ->nullable()
-                ->constrained('memberships')
-                ->nullOnDelete();
+            $table->unsignedBigInteger('sales_owner_membership_id')->nullable();
             $table->string('payment_terms')->nullable();
             $table->boolean('credit_hold')->default(false);
             $table->string('customer_number')->nullable();
@@ -28,9 +25,14 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
+            $table->foreign('sales_owner_membership_id', 'org_companies_sales_owner_fk')
+                ->references('id')
+                ->on('memberships')
+                ->nullOnDelete();
+
             $table->unique(['organization_id', 'company_id']);
             $table->unique(['organization_id', 'id']);
-            $table->unique(['organization_id', 'customer_number']);
+            $table->unique(['organization_id', 'customer_number'], 'org_companies_customer_number_unique');
             $table->index(['parent_account_id', 'organization_id']);
             $table->index(['parent_account_id', 'company_id']);
             $table->index(['parent_account_id', 'id']);

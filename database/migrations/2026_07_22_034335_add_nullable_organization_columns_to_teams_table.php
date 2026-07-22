@@ -28,10 +28,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('teams', function (Blueprint $table) {
-            $table->dropUnique(['organization_id', 'id']);
-            $table->dropIndex(['parent_account_id', 'id']);
             $table->dropForeign(['organization_id']);
             $table->dropForeign(['parent_account_id']);
+            $table->dropUnique(['organization_id', 'id']);
+            $table->dropIndex(['parent_account_id', 'id']);
             $table->dropColumn(['organization_id', 'parent_account_id']);
         });
     }
