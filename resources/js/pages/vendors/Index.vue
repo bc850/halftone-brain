@@ -4,8 +4,22 @@ import { Plus } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index, show } from '@/routes/vendors';
+import {
+    create as orgCreate,
+    index as orgIndex,
+    show as orgShow,
+} from '@/routes/org/vendors';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    show as legacyShow,
+} from '@/routes/vendors';
+
+const create = useTenantRoute(legacyCreate, orgCreate);
+const index = useTenantRoute(legacyIndex, orgIndex);
+const show = useTenantRoute(legacyShow, orgShow);
 
 type Vendor = {
     id: number;
@@ -36,7 +50,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Vendors', href: index() },
+            { title: 'Vendors', href: legacyIndex() },
         ],
     },
 });
@@ -46,8 +60,13 @@ defineOptions({
     <Head title="Vendors" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <Heading title="Vendors" description="Suppliers for catalog products" />
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <Heading
+                title="Vendors"
+                description="Suppliers for catalog products"
+            />
             <Button v-if="canManage" as-child>
                 <Link :href="create()">
                     <Plus class="size-4" />
@@ -80,7 +99,10 @@ defineOptions({
                         class="border-t hover:bg-muted/30"
                     >
                         <td class="px-4 py-3">
-                            <Link :href="show(vendor.id)" class="font-medium hover:underline">
+                            <Link
+                                :href="show(vendor.id)"
+                                class="font-medium hover:underline"
+                            >
                                 {{ vendor.name }}
                             </Link>
                         </td>
@@ -95,7 +117,10 @@ defineOptions({
                         </td>
                     </tr>
                     <tr v-if="vendors.data.length === 0">
-                        <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
+                        <td
+                            colspan="4"
+                            class="px-4 py-8 text-center text-muted-foreground"
+                        >
                             No vendors yet.
                         </td>
                     </tr>

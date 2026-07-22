@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import VendorController from '@/actions/App/Http/Controllers/VendorController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index } from '@/routes/vendors';
+import { index as orgIndex, store as orgStore } from '@/routes/org/vendors';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    store as legacyStore,
+} from '@/routes/vendors';
+
+const index = useTenantRoute(legacyIndex, orgIndex);
+const store = useTenantRoute(legacyStore, orgStore);
 
 const textareaClass =
     'border-input bg-transparent dark:bg-input/30 min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]';
@@ -16,8 +24,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Vendors', href: index() },
-            { title: 'New', href: create() },
+            { title: 'Vendors', href: legacyIndex() },
+            { title: 'New', href: legacyCreate() },
         ],
     },
 });
@@ -30,7 +38,7 @@ defineOptions({
         <Heading title="New vendor" description="Add a supplier" />
 
         <Form
-            v-bind="VendorController.store.form()"
+            v-bind="store.form()"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
@@ -56,7 +64,12 @@ defineOptions({
             </div>
             <div class="grid gap-2">
                 <Label for="website">Website</Label>
-                <Input id="website" name="website" type="url" placeholder="https://" />
+                <Input
+                    id="website"
+                    name="website"
+                    type="url"
+                    placeholder="https://"
+                />
                 <InputError :message="errors.website" />
             </div>
             <div class="grid gap-2">
@@ -64,11 +77,19 @@ defineOptions({
                 <textarea id="notes" name="notes" :class="textareaClass" />
             </div>
             <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="is_active" value="1" class="size-4 rounded border" checked />
+                <input
+                    type="checkbox"
+                    name="is_active"
+                    value="1"
+                    class="size-4 rounded border"
+                    checked
+                />
                 Active
             </label>
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Create vendor</Button>
+                <Button type="submit" :disabled="processing"
+                    >Create vendor</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="index()">Cancel</Link>
                 </Button>

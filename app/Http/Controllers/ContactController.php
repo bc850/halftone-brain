@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreContactRequest;
 use App\Http\Requests\UpdateContactRequest;
 use App\Models\Company;
 use App\Models\Contact;
+use App\Models\Organization;
 use App\Models\User;
+use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantRoute;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +19,8 @@ use Inertia\Response;
 
 class ContactController extends Controller
 {
+    use ScopesQueriesToTenant;
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Contact::class);
@@ -22,9 +28,15 @@ class ContactController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $contacts = Contact::query()
-            ->visibleTo($user)
-            ->with('company:id,name,owner_id')
+        $contactsQuery = Contact::query()->with('company:id,name,owner_id');
+
+        if (TenantContext::has()) {
+            $contactsQuery = $this->scopeContactsForRequest($contactsQuery);
+        } else {
+            $contactsQuery->visibleTo($user);
+        }
+
+        $contacts = $contactsQuery
             ->when($request->string('search')->toString(), function ($query, string $search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('first_name', 'like', "%{$search}%")
@@ -53,11 +65,16 @@ class ContactController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $companiesQuery = Company::query()->orderBy('name');
+
+        if (TenantContext::has()) {
+            $companiesQuery = $this->scopeCompaniesForRequest($companiesQuery);
+        } else {
+            $companiesQuery->visibleTo($user);
+        }
+
         return Inertia::render('contacts/Create', [
-            'companies' => Company::query()
-                ->visibleTo($user)
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'companies' => $companiesQuery->get(['id', 'name']),
             'selectedCompanyId' => $request->integer('company_id') ?: null,
         ]);
     }
@@ -68,6 +85,10 @@ class ContactController extends Controller
 
         $data = $request->validated();
         $data['is_primary'] = $request->boolean('is_primary');
+
+        if (TenantContext::has()) {
+            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
+        }
 
         $contact = DB::transaction(function () use ($data): Contact {
             if ($data['is_primary'] === true) {
@@ -81,10 +102,10 @@ class ContactController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Contact created.')]);
 
-        return to_route('contacts.show', $contact);
+        return redirect()->to(TenantRoute::to('contacts.show', $contact));
     }
 
-    public function show(Contact $contact): Response
+    public function show(?Organization $organization, Contact $contact): Response
     {
         $this->authorize('view', $contact);
 
@@ -95,23 +116,28 @@ class ContactController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Contact $contact): Response
+    public function edit(Request $request, ?Organization $organization, Contact $contact): Response
     {
         $this->authorize('update', $contact);
 
         /** @var User $user */
         $user = $request->user();
 
+        $companiesQuery = Company::query()->orderBy('name');
+
+        if (TenantContext::has()) {
+            $companiesQuery = $this->scopeCompaniesForRequest($companiesQuery);
+        } else {
+            $companiesQuery->visibleTo($user);
+        }
+
         return Inertia::render('contacts/Edit', [
             'contact' => $contact,
-            'companies' => Company::query()
-                ->visibleTo($user)
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'companies' => $companiesQuery->get(['id', 'name']),
         ]);
     }
 
-    public function update(UpdateContactRequest $request, Contact $contact): RedirectResponse
+    public function update(UpdateContactRequest $request, ?Organization $organization, Contact $contact): RedirectResponse
     {
         $data = $request->validated();
         $data['is_primary'] = $request->boolean('is_primary');
@@ -129,10 +155,10 @@ class ContactController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Contact updated.')]);
 
-        return to_route('contacts.show', $contact);
+        return redirect()->to(TenantRoute::to('contacts.show', $contact));
     }
 
-    public function destroy(Contact $contact): RedirectResponse
+    public function destroy(?Organization $organization, Contact $contact): RedirectResponse
     {
         $this->authorize('delete', $contact);
 
@@ -140,6 +166,6 @@ class ContactController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Contact deleted.')]);
 
-        return to_route('contacts.index');
+        return redirect()->to(TenantRoute::to('contacts.index'));
     }
 }

@@ -1,13 +1,31 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil } from '@lucide/vue';
-import DealController from '@/actions/App/Http/Controllers/DealController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as showCompany } from '@/routes/companies';
-import { show as showContact } from '@/routes/contacts';
-import { edit, index } from '@/routes/deals';
+import { show as legacyShowCompany } from '@/routes/companies';
+import { show as legacyShowContact } from '@/routes/contacts';
+import {
+    destroy as legacyDestroy,
+    edit as legacyEdit,
+    index as legacyIndex,
+    stage as legacyStage,
+} from '@/routes/deals';
+import { show as orgShowCompany } from '@/routes/org/companies';
+import { show as orgShowContact } from '@/routes/org/contacts';
+import {
+    destroy as orgDestroy,
+    edit as orgEdit,
+    stage as orgStage,
+} from '@/routes/org/deals';
+
+const destroy = useTenantRoute(legacyDestroy, orgDestroy);
+const edit = useTenantRoute(legacyEdit, orgEdit);
+const updateStage = useTenantRoute(legacyStage, orgStage);
+const showCompany = useTenantRoute(legacyShowCompany, orgShowCompany);
+const showContact = useTenantRoute(legacyShowContact, orgShowContact);
 
 type StageOption = { value: string; label: string };
 
@@ -51,13 +69,17 @@ function stageLabel(value: string): string {
 }
 
 function moveDeal(event: Event): void {
-    const stage = (event.target as HTMLSelectElement).value;
-    router.patch(DealController.updateStage.url(props.deal.id), { stage }, { preserveScroll: true });
+    const nextStage = (event.target as HTMLSelectElement).value;
+    router.patch(
+        updateStage.url(props.deal.id),
+        { stage: nextStage },
+        { preserveScroll: true },
+    );
 }
 
 function deleteDeal(): void {
     if (confirm('Delete this deal?')) {
-        router.delete(DealController.destroy.url(props.deal.id));
+        router.delete(destroy.url(props.deal.id));
     }
 }
 
@@ -65,8 +87,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Deals', href: index() },
-            { title: 'Deal', href: index() },
+            { title: 'Deals', href: legacyIndex() },
+            { title: 'Deal', href: legacyIndex() },
         ],
     },
 });
@@ -76,7 +98,9 @@ defineOptions({
     <Head :title="deal.name" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
             <Heading
                 :title="deal.name"
                 :description="deal.company ? deal.company.name : undefined"
@@ -116,12 +140,21 @@ defineOptions({
                     </div>
                     <div class="flex justify-between gap-4">
                         <dt class="text-muted-foreground">Expected close</dt>
-                        <dd>{{ deal.expected_close_date?.slice(0, 10) ?? '—' }}</dd>
+                        <dd>
+                            {{ deal.expected_close_date?.slice(0, 10) ?? '—' }}
+                        </dd>
                     </div>
-                    <div v-if="deal.can_update" class="flex items-center justify-between gap-4">
+                    <div
+                        v-if="deal.can_update"
+                        class="flex items-center justify-between gap-4"
+                    >
                         <dt class="text-muted-foreground">Stage</dt>
                         <dd>
-                            <select :class="fieldClass" :value="deal.stage" @change="moveDeal">
+                            <select
+                                :class="fieldClass"
+                                :value="deal.stage"
+                                @change="moveDeal"
+                            >
                                 <option
                                     v-for="stage in stages"
                                     :key="stage.value"
@@ -137,12 +170,17 @@ defineOptions({
                         <dd>{{ stageLabel(deal.stage) }}</dd>
                     </div>
                 </dl>
-                <p v-if="deal.notes" class="text-muted-foreground">{{ deal.notes }}</p>
+                <p v-if="deal.notes" class="text-muted-foreground">
+                    {{ deal.notes }}
+                </p>
             </section>
 
             <section class="space-y-3 rounded-xl border p-4 text-sm">
                 <h2 class="font-medium">Contacts</h2>
-                <div v-if="deal.primary_contact" class="rounded-md bg-muted/40 p-3">
+                <div
+                    v-if="deal.primary_contact"
+                    class="rounded-md bg-muted/40 p-3"
+                >
                     <p class="text-xs text-muted-foreground">Primary</p>
                     <Link
                         :href="showContact(deal.primary_contact.id)"
@@ -152,7 +190,11 @@ defineOptions({
                         {{ deal.primary_contact.last_name }}
                     </Link>
                     <p class="text-muted-foreground">
-                        {{ deal.primary_contact.email ?? deal.primary_contact.phone ?? '—' }}
+                        {{
+                            deal.primary_contact.email ??
+                            deal.primary_contact.phone ??
+                            '—'
+                        }}
                     </p>
                 </div>
                 <ul class="divide-y">
@@ -161,12 +203,17 @@ defineOptions({
                         :key="contact.id"
                         class="py-2"
                     >
-                        <Link :href="showContact(contact.id)" class="hover:underline">
+                        <Link
+                            :href="showContact(contact.id)"
+                            class="hover:underline"
+                        >
                             {{ contact.first_name }} {{ contact.last_name }}
                         </Link>
                     </li>
                     <li
-                        v-if="deal.contacts.length === 0 && !deal.primary_contact"
+                        v-if="
+                            deal.contacts.length === 0 && !deal.primary_contact
+                        "
                         class="py-4 text-muted-foreground"
                     >
                         No contacts linked.

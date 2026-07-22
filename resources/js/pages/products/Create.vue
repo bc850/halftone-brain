@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
-import ProductController from '@/actions/App/Http/Controllers/ProductController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index } from '@/routes/products';
+import { index as orgIndex, store as orgStore } from '@/routes/org/products';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    store as legacyStore,
+} from '@/routes/products';
+
+const index = useTenantRoute(legacyIndex, orgIndex);
+const store = useTenantRoute(legacyStore, orgStore);
 
 type Option = { id: number; name: string };
 type Unit = { value: string; label: string };
@@ -27,6 +35,7 @@ const markupPercent = ref('50');
 const suggested = computed(() => {
     const cost = Number(trueCost.value) || 0;
     const markup = Number(markupPercent.value) || 0;
+
     return (cost * (1 + markup / 100)).toFixed(2);
 });
 
@@ -39,8 +48,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Products', href: index() },
-            { title: 'New', href: create() },
+            { title: 'Products', href: legacyIndex() },
+            { title: 'New', href: legacyCreate() },
         ],
     },
 });
@@ -50,10 +59,13 @@ defineOptions({
     <Head title="New product" />
 
     <div class="flex flex-col gap-6 p-4">
-        <Heading title="New product" description="Fixed true cost + markup sets suggested sell" />
+        <Heading
+            title="New product"
+            description="Fixed true cost + markup sets suggested sell"
+        />
 
         <Form
-            v-bind="ProductController.store.form()"
+            v-bind="store.form()"
             class="mx-auto grid w-full max-w-3xl gap-6"
             v-slot="{ errors, processing }"
         >
@@ -76,14 +88,22 @@ defineOptions({
                     <Label for="vendor_id">Vendor</Label>
                     <select id="vendor_id" name="vendor_id" :class="fieldClass">
                         <option value="">None</option>
-                        <option v-for="vendor in vendors" :key="vendor.id" :value="vendor.id">
+                        <option
+                            v-for="vendor in vendors"
+                            :key="vendor.id"
+                            :value="vendor.id"
+                        >
                             {{ vendor.name }}
                         </option>
                     </select>
                 </div>
                 <div class="grid gap-2">
                     <Label for="product_category_id">Category</Label>
-                    <select id="product_category_id" name="product_category_id" :class="fieldClass">
+                    <select
+                        id="product_category_id"
+                        name="product_category_id"
+                        :class="fieldClass"
+                    >
                         <option value="">None</option>
                         <option
                             v-for="category in categories"
@@ -96,8 +116,17 @@ defineOptions({
                 </div>
                 <div class="grid gap-2">
                     <Label for="unit_of_measure">Unit of measure</Label>
-                    <select id="unit_of_measure" name="unit_of_measure" :class="fieldClass" required>
-                        <option v-for="unit in units" :key="unit.value" :value="unit.value">
+                    <select
+                        id="unit_of_measure"
+                        name="unit_of_measure"
+                        :class="fieldClass"
+                        required
+                    >
+                        <option
+                            v-for="unit in units"
+                            :key="unit.value"
+                            :value="unit.value"
+                        >
                             {{ unit.label }}
                         </option>
                     </select>
@@ -151,7 +180,11 @@ defineOptions({
 
             <div class="grid gap-2">
                 <Label for="description">Description</Label>
-                <textarea id="description" name="description" :class="textareaClass" />
+                <textarea
+                    id="description"
+                    name="description"
+                    :class="textareaClass"
+                />
             </div>
             <div class="grid gap-2">
                 <Label for="notes">Notes</Label>
@@ -160,7 +193,9 @@ defineOptions({
 
             <div v-if="relatedOptions.length" class="grid gap-2">
                 <Label>Related products</Label>
-                <div class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                <div
+                    class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3"
+                >
                     <label
                         v-for="option in relatedOptions"
                         :key="option.id"
@@ -173,18 +208,28 @@ defineOptions({
                             class="size-4 rounded border"
                         />
                         {{ option.name }}
-                        <span class="text-muted-foreground">({{ option.sku }})</span>
+                        <span class="text-muted-foreground"
+                            >({{ option.sku }})</span
+                        >
                     </label>
                 </div>
             </div>
 
             <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="is_active" value="1" class="size-4 rounded border" checked />
+                <input
+                    type="checkbox"
+                    name="is_active"
+                    value="1"
+                    class="size-4 rounded border"
+                    checked
+                />
                 Active
             </label>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Create product</Button>
+                <Button type="submit" :disabled="processing"
+                    >Create product</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="index()">Cancel</Link>
                 </Button>

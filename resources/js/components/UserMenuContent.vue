@@ -21,14 +21,20 @@ type Props = {
 defineProps<Props>();
 
 const page = usePage();
-const authUser = computed(() => page.props.auth.user as User & {
-    role?: string;
-    see_everyone?: boolean;
-});
+const authUser = computed(
+    () =>
+        page.props.auth.user as User & {
+            role?: string;
+            see_everyone?: boolean;
+        },
+);
 
 const canToggleVisibility = computed(() => {
     const role = authUser.value?.role;
-    return role === 'salesman' || role === 'project_manager' || role === 'admin';
+
+    return (
+        role === 'salesman' || role === 'project_manager' || role === 'admin'
+    );
 });
 
 const handleLogout = () => {

@@ -1,13 +1,26 @@
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
-import DealController from '@/actions/App/Http/Controllers/DealController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index } from '@/routes/deals';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    store as legacyStore,
+} from '@/routes/deals';
+import {
+    create as orgCreate,
+    index as orgIndex,
+    store as orgStore,
+} from '@/routes/org/deals';
+
+const create = useTenantRoute(legacyCreate, orgCreate);
+const index = useTenantRoute(legacyIndex, orgIndex);
+const store = useTenantRoute(legacyStore, orgStore);
 
 type Option = { value: string; label: string };
 type Person = { id: number; name: string };
@@ -19,7 +32,7 @@ type ContactOption = {
     company_id: number;
 };
 
-const props = defineProps<{
+defineProps<{
     companies: CompanyOption[];
     contacts: ContactOption[];
     selectedCompanyId: number | null;
@@ -46,8 +59,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Deals', href: index() },
-            { title: 'New', href: create() },
+            { title: 'Deals', href: legacyIndex() },
+            { title: 'New', href: legacyCreate() },
         ],
     },
 });
@@ -57,10 +70,13 @@ defineOptions({
     <Head title="New deal" />
 
     <div class="flex flex-col gap-6 p-4">
-        <Heading title="New deal" description="Create an opportunity under a company" />
+        <Heading
+            title="New deal"
+            description="Create an opportunity under a company"
+        />
 
         <Form
-            v-bind="DealController.store.form()"
+            v-bind="store.form()"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
@@ -102,7 +118,11 @@ defineOptions({
                     :disabled="contacts.length === 0"
                 >
                     <option value="">None</option>
-                    <option v-for="contact in contacts" :key="contact.id" :value="contact.id">
+                    <option
+                        v-for="contact in contacts"
+                        :key="contact.id"
+                        :value="contact.id"
+                    >
                         {{ contact.first_name }} {{ contact.last_name }}
                     </option>
                 </select>
@@ -132,7 +152,12 @@ defineOptions({
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="grid gap-2">
                     <Label for="stage">Stage</Label>
-                    <select id="stage" name="stage" :class="fieldClass" required>
+                    <select
+                        id="stage"
+                        name="stage"
+                        :class="fieldClass"
+                        required
+                    >
                         <option
                             v-for="stage in stages"
                             :key="stage.value"
@@ -146,7 +171,13 @@ defineOptions({
                 </div>
                 <div class="grid gap-2">
                     <Label for="amount">Amount</Label>
-                    <Input id="amount" name="amount" type="number" step="0.01" min="0" />
+                    <Input
+                        id="amount"
+                        name="amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                    />
                     <InputError :message="errors.amount" />
                 </div>
             </div>
@@ -154,7 +185,11 @@ defineOptions({
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="grid gap-2">
                     <Label for="expected_close_date">Expected close</Label>
-                    <Input id="expected_close_date" name="expected_close_date" type="date" />
+                    <Input
+                        id="expected_close_date"
+                        name="expected_close_date"
+                        type="date"
+                    />
                 </div>
                 <div v-if="salespeople.length" class="grid gap-2">
                     <Label for="owner_id">Owner</Label>
@@ -177,7 +212,9 @@ defineOptions({
             </div>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Create deal</Button>
+                <Button type="submit" :disabled="processing"
+                    >Create deal</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="index()">Cancel</Link>
                 </Button>

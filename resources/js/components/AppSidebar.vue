@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { Building2, Handshake, LayoutGrid, Package, Tags, Truck, Users } from '@lucide/vue';
+import {
+    Building2,
+    Handshake,
+    LayoutGrid,
+    Package,
+    Tags,
+    Truck,
+    Users,
+} from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
+import OrganizationSwitcher from '@/components/OrganizationSwitcher.vue';
 import {
     Sidebar,
     SidebarContent,
@@ -75,6 +84,7 @@ const footerNavItems: NavItem[] = [];
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
+                <OrganizationSwitcher />
             </SidebarMenu>
         </SidebarHeader>
 

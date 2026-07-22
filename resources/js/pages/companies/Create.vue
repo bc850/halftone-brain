@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import CompanyController from '@/actions/App/Http/Controllers/CompanyController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index } from '@/routes/companies';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    store as legacyStore,
+} from '@/routes/companies';
+import { index as orgIndex, store as orgStore } from '@/routes/org/companies';
+
+const index = useTenantRoute(legacyIndex, orgIndex);
+const store = useTenantRoute(legacyStore, orgStore);
 
 type Option = { value: string; label: string };
 type Person = { id: number; name: string };
@@ -26,8 +34,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Companies', href: index() },
-            { title: 'New', href: create() },
+            { title: 'Companies', href: legacyIndex() },
+            { title: 'New', href: legacyCreate() },
         ],
     },
 });
@@ -40,7 +48,7 @@ defineOptions({
         <Heading title="New company" description="Add a customer company" />
 
         <Form
-            v-bind="CompanyController.store.form()"
+            v-bind="store.form()"
             class="mx-auto grid w-full max-w-3xl gap-6"
             v-slot="{ errors, processing }"
         >
@@ -53,9 +61,18 @@ defineOptions({
 
                 <div v-if="salespeople.length" class="grid gap-2">
                     <Label for="owner_id">Owner</Label>
-                    <select id="owner_id" name="owner_id" :class="fieldClass" required>
+                    <select
+                        id="owner_id"
+                        name="owner_id"
+                        :class="fieldClass"
+                        required
+                    >
                         <option value="">Select salesperson</option>
-                        <option v-for="person in salespeople" :key="person.id" :value="person.id">
+                        <option
+                            v-for="person in salespeople"
+                            :key="person.id"
+                            :value="person.id"
+                        >
                             {{ person.name }}
                         </option>
                     </select>
@@ -98,12 +115,22 @@ defineOptions({
                 <h2 class="text-sm font-medium">Billing address</h2>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="billing_address_line1">Address line 1</Label>
-                        <Input id="billing_address_line1" name="billing_address_line1" />
+                        <Label for="billing_address_line1"
+                            >Address line 1</Label
+                        >
+                        <Input
+                            id="billing_address_line1"
+                            name="billing_address_line1"
+                        />
                     </div>
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="billing_address_line2">Address line 2</Label>
-                        <Input id="billing_address_line2" name="billing_address_line2" />
+                        <Label for="billing_address_line2"
+                            >Address line 2</Label
+                        >
+                        <Input
+                            id="billing_address_line2"
+                            name="billing_address_line2"
+                        />
                     </div>
                     <div class="grid gap-2">
                         <Label for="billing_city">City</Label>
@@ -115,11 +142,18 @@ defineOptions({
                     </div>
                     <div class="grid gap-2">
                         <Label for="billing_postal_code">Postal code</Label>
-                        <Input id="billing_postal_code" name="billing_postal_code" />
+                        <Input
+                            id="billing_postal_code"
+                            name="billing_postal_code"
+                        />
                     </div>
                     <div class="grid gap-2">
                         <Label for="billing_country">Country</Label>
-                        <Input id="billing_country" name="billing_country" default-value="US" />
+                        <Input
+                            id="billing_country"
+                            name="billing_country"
+                            default-value="US"
+                        />
                     </div>
                 </div>
             </div>
@@ -128,12 +162,22 @@ defineOptions({
                 <h2 class="text-sm font-medium">Shipping address</h2>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="shipping_address_line1">Address line 1</Label>
-                        <Input id="shipping_address_line1" name="shipping_address_line1" />
+                        <Label for="shipping_address_line1"
+                            >Address line 1</Label
+                        >
+                        <Input
+                            id="shipping_address_line1"
+                            name="shipping_address_line1"
+                        />
                     </div>
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="shipping_address_line2">Address line 2</Label>
-                        <Input id="shipping_address_line2" name="shipping_address_line2" />
+                        <Label for="shipping_address_line2"
+                            >Address line 2</Label
+                        >
+                        <Input
+                            id="shipping_address_line2"
+                            name="shipping_address_line2"
+                        />
                     </div>
                     <div class="grid gap-2">
                         <Label for="shipping_city">City</Label>
@@ -145,11 +189,18 @@ defineOptions({
                     </div>
                     <div class="grid gap-2">
                         <Label for="shipping_postal_code">Postal code</Label>
-                        <Input id="shipping_postal_code" name="shipping_postal_code" />
+                        <Input
+                            id="shipping_postal_code"
+                            name="shipping_postal_code"
+                        />
                     </div>
                     <div class="grid gap-2">
                         <Label for="shipping_country">Country</Label>
-                        <Input id="shipping_country" name="shipping_country" default-value="US" />
+                        <Input
+                            id="shipping_country"
+                            name="shipping_country"
+                            default-value="US"
+                        />
                     </div>
                 </div>
             </div>
@@ -161,7 +212,9 @@ defineOptions({
             </div>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Create company</Button>
+                <Button type="submit" :disabled="processing"
+                    >Create company</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="index()">Cancel</Link>
                 </Button>

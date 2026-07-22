@@ -27,7 +27,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 #[Fillable([
     'name',
+    'organization_id',
+    'parent_account_id',
     'company_id',
+    'organization_company_id',
     'primary_contact_id',
     'owner_id',
     'stage',

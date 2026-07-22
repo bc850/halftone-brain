@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Enums\DealStage;
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreDealRequest;
 use App\Http\Requests\UpdateDealRequest;
 use App\Http\Resources\DealResource;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Models\Deal;
+use App\Models\Organization;
+use App\Models\OrganizationCompany;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantRoute;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +26,8 @@ use Inertia\Response;
 
 class DealController extends Controller
 {
+    use ScopesQueriesToTenant;
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Deal::class);
@@ -28,13 +35,20 @@ class DealController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $deals = Deal::query()
-            ->visibleTo($user)
+        $dealsQuery = Deal::query()
             ->with([
                 'company:id,name',
                 'owner:id,name',
                 'primaryContact:id,first_name,last_name',
-            ])
+            ]);
+
+        if (TenantContext::has()) {
+            $dealsQuery = $this->scopeDealsForRequest($dealsQuery);
+        } else {
+            $dealsQuery->visibleTo($user);
+        }
+
+        $deals = $dealsQuery
             ->when($request->string('search')->toString(), function ($query, string $search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
@@ -78,9 +92,15 @@ class DealController extends Controller
         $contactId = $request->integer('contact_id') ?: null;
 
         if ($contactId) {
-            $contact = Contact::query()
-                ->visibleTo($user)
-                ->find($contactId);
+            $contactsQuery = Contact::query();
+
+            if (TenantContext::has()) {
+                $contactsQuery = $this->scopeContactsForRequest($contactsQuery);
+            } else {
+                $contactsQuery->visibleTo($user);
+            }
+
+            $contact = $contactsQuery->find($contactId);
 
             if ($contact) {
                 $companyId = $contact->company_id;
@@ -101,11 +121,16 @@ class DealController extends Controller
             $contactId = $contacts->firstWhere('is_primary', true)?->id;
         }
 
+        $companiesQuery = Company::query()->orderBy('name');
+
+        if (TenantContext::has()) {
+            $companiesQuery = $this->scopeCompaniesForRequest($companiesQuery);
+        } else {
+            $companiesQuery->visibleTo($user);
+        }
+
         return Inertia::render('deals/Create', [
-            'companies' => Company::query()
-                ->visibleTo($user)
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'companies' => $companiesQuery->get(['id', 'name']),
             'contacts' => $contacts->map(fn (Contact $contact): array => [
                 'id' => $contact->id,
                 'first_name' => $contact->first_name,
@@ -139,6 +164,21 @@ class DealController extends Controller
             ? $data['owner_id']
             : $user->id;
 
+        if (TenantContext::has()) {
+            $tenant = TenantContext::get();
+            $data['organization_id'] = $tenant->organizationId;
+            $data['parent_account_id'] = $tenant->parentAccountId;
+
+            $organizationCompany = OrganizationCompany::query()
+                ->where('organization_id', $tenant->organizationId)
+                ->where('company_id', $data['company_id'])
+                ->first();
+
+            if ($organizationCompany !== null) {
+                $data['organization_company_id'] = $organizationCompany->id;
+            }
+        }
+
         $deal = DB::transaction(function () use ($data, $contactIds): Deal {
             $deal = Deal::query()->create($data);
 
@@ -153,10 +193,10 @@ class DealController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Deal created.')]);
 
-        return to_route('deals.show', $deal);
+        return redirect()->to(TenantRoute::to('deals.show', $deal));
     }
 
-    public function show(Deal $deal): Response
+    public function show(?Organization $organization, Deal $deal): Response
     {
         $this->authorize('view', $deal);
 
@@ -179,7 +219,7 @@ class DealController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Deal $deal): Response
+    public function edit(Request $request, ?Organization $organization, Deal $deal): Response
     {
         $this->authorize('update', $deal);
 
@@ -192,12 +232,17 @@ class DealController extends Controller
         $dealPayload['company_id'] = $companyId;
         $dealPayload['contact_ids'] = $deal->contacts->pluck('id');
 
+        $companiesQuery = Company::query()->orderBy('name');
+
+        if (TenantContext::has()) {
+            $companiesQuery = $this->scopeCompaniesForRequest($companiesQuery);
+        } else {
+            $companiesQuery->visibleTo($user);
+        }
+
         return Inertia::render('deals/Edit', [
             'deal' => $dealPayload,
-            'companies' => Company::query()
-                ->visibleTo($user)
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'companies' => $companiesQuery->get(['id', 'name']),
             'contacts' => Contact::query()
                 ->where('company_id', $companyId)
                 ->orderBy('last_name')
@@ -215,7 +260,7 @@ class DealController extends Controller
         ]);
     }
 
-    public function update(UpdateDealRequest $request, Deal $deal): RedirectResponse
+    public function update(UpdateDealRequest $request, ?Organization $organization, Deal $deal): RedirectResponse
     {
         $data = $request->validated();
         $contactIds = $data['contact_ids'] ?? [];
@@ -233,10 +278,10 @@ class DealController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Deal updated.')]);
 
-        return to_route('deals.show', $deal);
+        return redirect()->to(TenantRoute::to('deals.show', $deal));
     }
 
-    public function destroy(Deal $deal): RedirectResponse
+    public function destroy(?Organization $organization, Deal $deal): RedirectResponse
     {
         $this->authorize('delete', $deal);
 
@@ -244,10 +289,10 @@ class DealController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Deal deleted.')]);
 
-        return to_route('deals.index');
+        return redirect()->to(TenantRoute::to('deals.index'));
     }
 
-    public function updateStage(Request $request, Deal $deal): RedirectResponse
+    public function updateStage(Request $request, ?Organization $organization, Deal $deal): RedirectResponse
     {
         $this->authorize('update', $deal);
 

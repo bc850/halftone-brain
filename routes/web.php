@@ -7,6 +7,7 @@ use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VisibilityPreferenceController;
+use App\Http\Middleware\ResolveTenantContextFromRoute;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -27,5 +28,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->parameters(['categories' => 'category']);
     Route::resource('products', ProductController::class);
 });
+
+Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
+    ->prefix('o/{organization}')
+    ->name('org.')
+    ->group(function () {
+        Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+
+        Route::resource('companies', CompanyController::class);
+        Route::resource('contacts', ContactController::class);
+        Route::resource('deals', DealController::class);
+        Route::patch('deals/{deal}/stage', [DealController::class, 'updateStage'])->name('deals.stage');
+
+        Route::resource('vendors', VendorController::class);
+        Route::resource('categories', ProductCategoryController::class)
+            ->parameters(['categories' => 'category']);
+        Route::resource('products', ProductController::class);
+    });
 
 require __DIR__.'/settings.php';

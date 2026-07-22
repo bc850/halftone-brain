@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import ContactController from '@/actions/App/Http/Controllers/ContactController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index } from '@/routes/contacts';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    store as legacyStore,
+} from '@/routes/contacts';
+import { index as orgIndex, store as orgStore } from '@/routes/org/contacts';
+
+const index = useTenantRoute(legacyIndex, orgIndex);
+const store = useTenantRoute(legacyStore, orgStore);
 
 type CompanyOption = { id: number; name: string };
 
@@ -25,8 +33,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Contacts', href: index() },
-            { title: 'New', href: create() },
+            { title: 'Contacts', href: legacyIndex() },
+            { title: 'New', href: legacyCreate() },
         ],
     },
 });
@@ -39,7 +47,7 @@ defineOptions({
         <Heading title="New contact" description="Add a person to a company" />
 
         <Form
-            v-bind="ContactController.store.form()"
+            v-bind="store.form()"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
@@ -97,7 +105,12 @@ defineOptions({
             </div>
 
             <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="is_primary" value="1" class="size-4 rounded border" />
+                <input
+                    type="checkbox"
+                    name="is_primary"
+                    value="1"
+                    class="size-4 rounded border"
+                />
                 Primary contact
             </label>
 
@@ -107,7 +120,9 @@ defineOptions({
             </div>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Create contact</Button>
+                <Button type="submit" :disabled="processing"
+                    >Create contact</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="index()">Cancel</Link>
                 </Button>

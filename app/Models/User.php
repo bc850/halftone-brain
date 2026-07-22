@@ -95,4 +95,20 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->hasMany(Deal::class, 'owner_id');
     }
+
+    /**
+     * @return HasMany<Membership, $this>
+     */
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(Membership::class);
+    }
+
+    /**
+     * @return HasMany<ParentAccountMembership, $this>
+     */
+    public function parentAccountMemberships(): HasMany
+    {
+        return $this->hasMany(ParentAccountMembership::class);
+    }
 }

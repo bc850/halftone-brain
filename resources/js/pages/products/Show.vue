@@ -1,13 +1,31 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil } from '@lucide/vue';
-import ProductController from '@/actions/App/Http/Controllers/ProductController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as showCategory } from '@/routes/categories';
-import { edit, index, show as showProduct } from '@/routes/products';
-import { show as showVendor } from '@/routes/vendors';
+import { show as legacyShowCategory } from '@/routes/categories';
+import { show as orgShowCategory } from '@/routes/org/categories';
+import {
+    destroy as orgDestroy,
+    edit as orgEdit,
+    show as orgShowProduct,
+} from '@/routes/org/products';
+import { show as orgShowVendor } from '@/routes/org/vendors';
+import {
+    destroy as legacyDestroy,
+    edit as legacyEdit,
+    index as legacyIndex,
+    show as legacyShowProduct,
+} from '@/routes/products';
+import { show as legacyShowVendor } from '@/routes/vendors';
+
+const destroy = useTenantRoute(legacyDestroy, orgDestroy);
+const edit = useTenantRoute(legacyEdit, orgEdit);
+const showProduct = useTenantRoute(legacyShowProduct, orgShowProduct);
+const showCategory = useTenantRoute(legacyShowCategory, orgShowCategory);
+const showVendor = useTenantRoute(legacyShowVendor, orgShowVendor);
 
 type Related = {
     id: number;
@@ -42,7 +60,7 @@ const props = defineProps<{
 
 function deleteProduct(): void {
     if (confirm('Delete this product?')) {
-        router.delete(ProductController.destroy.url(props.product.id));
+        router.delete(destroy.url(props.product.id));
     }
 }
 
@@ -50,8 +68,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Products', href: index() },
-            { title: 'Product', href: index() },
+            { title: 'Products', href: legacyIndex() },
+            { title: 'Product', href: legacyIndex() },
         ],
     },
 });
@@ -61,10 +79,16 @@ defineOptions({
     <Head :title="product.name" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
             <Heading
                 :title="product.name"
-                :description="product.is_active ? product.sku : `${product.sku} · Inactive`"
+                :description="
+                    product.is_active
+                        ? product.sku
+                        : `${product.sku} · Inactive`
+                "
             />
             <Button v-if="canManage" variant="outline" as-child>
                 <Link :href="edit(product.id)">
@@ -105,9 +129,14 @@ defineOptions({
                 </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Unit</span>
-                    <span class="capitalize">{{ product.unit_of_measure.replaceAll('_', ' ') }}</span>
+                    <span class="capitalize">{{
+                        product.unit_of_measure.replaceAll('_', ' ')
+                    }}</span>
                 </div>
-                <p v-if="product.description" class="pt-2 text-muted-foreground">
+                <p
+                    v-if="product.description"
+                    class="pt-2 text-muted-foreground"
+                >
                     {{ product.description }}
                 </p>
             </section>
@@ -126,15 +155,22 @@ defineOptions({
                 </template>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Suggested sell</span>
-                    <span class="font-medium">${{ product.suggested_sell_price }}</span>
+                    <span class="font-medium"
+                        >${{ product.suggested_sell_price }}</span
+                    >
                 </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">List price</span>
                     <span>
-                        {{ product.list_price ? `$${product.list_price}` : '—' }}
+                        {{
+                            product.list_price ? `$${product.list_price}` : '—'
+                        }}
                     </span>
                 </div>
-                <p v-if="canViewCost && product.notes" class="pt-2 text-muted-foreground">
+                <p
+                    v-if="canViewCost && product.notes"
+                    class="pt-2 text-muted-foreground"
+                >
                     {{ product.notes }}
                 </p>
             </section>
@@ -150,10 +186,15 @@ defineOptions({
                         :key="related.id"
                         class="flex justify-between gap-3 py-2"
                     >
-                        <Link :href="showProduct(related.id)" class="hover:underline">
+                        <Link
+                            :href="showProduct(related.id)"
+                            class="hover:underline"
+                        >
                             {{ related.name }}
                         </Link>
-                        <span class="text-muted-foreground">{{ related.sku }}</span>
+                        <span class="text-muted-foreground">{{
+                            related.sku
+                        }}</span>
                     </li>
                     <li
                         v-if="product.related_products.length === 0"

@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import VendorController from '@/actions/App/Http/Controllers/VendorController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { index, show } from '@/routes/vendors';
+import { show as orgShow, update as orgUpdate } from '@/routes/org/vendors';
+import {
+    index as legacyIndex,
+    show as legacyShow,
+    update as legacyUpdate,
+} from '@/routes/vendors';
+
+const show = useTenantRoute(legacyShow, orgShow);
+const update = useTenantRoute(legacyUpdate, orgUpdate);
 
 type Vendor = {
     id: number;
@@ -31,8 +39,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Vendors', href: index() },
-            { title: 'Edit', href: index() },
+            { title: 'Vendors', href: legacyIndex() },
+            { title: 'Edit', href: legacyIndex() },
         ],
     },
 });
@@ -45,13 +53,18 @@ defineOptions({
         <Heading :title="`Edit ${vendor.name}`" />
 
         <Form
-            v-bind="VendorController.update.form(vendor.id)"
+            v-bind="update.form(vendor.id)"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
                 <Label for="name">Name</Label>
-                <Input id="name" name="name" :default-value="vendor.name" required />
+                <Input
+                    id="name"
+                    name="name"
+                    :default-value="vendor.name"
+                    required
+                />
                 <InputError :message="errors.name" />
             </div>
             <div class="grid gap-2">
@@ -74,18 +87,30 @@ defineOptions({
                 </div>
                 <div class="grid gap-2">
                     <Label for="phone">Phone</Label>
-                    <Input id="phone" name="phone" :default-value="vendor.phone ?? ''" />
+                    <Input
+                        id="phone"
+                        name="phone"
+                        :default-value="vendor.phone ?? ''"
+                    />
                 </div>
             </div>
             <div class="grid gap-2">
                 <Label for="website">Website</Label>
-                <Input id="website" name="website" type="url" :default-value="vendor.website ?? ''" />
+                <Input
+                    id="website"
+                    name="website"
+                    type="url"
+                    :default-value="vendor.website ?? ''"
+                />
             </div>
             <div class="grid gap-2">
                 <Label for="notes">Notes</Label>
-                <textarea id="notes" name="notes" :class="textareaClass">{{
-                    vendor.notes ?? ''
-                }}</textarea>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    :class="textareaClass"
+                    :value="vendor.notes ?? ''"
+                />
             </div>
             <label class="flex items-center gap-2 text-sm">
                 <input
@@ -98,7 +123,9 @@ defineOptions({
                 Active
             </label>
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Save changes</Button>
+                <Button type="submit" :disabled="processing"
+                    >Save changes</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="show(vendor.id)">Cancel</Link>
                 </Button>

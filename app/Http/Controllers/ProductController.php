@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UnitOfMeasure;
+use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
+use App\Models\Organization;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantRoute;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +22,8 @@ use Inertia\Response;
 
 class ProductController extends Controller
 {
+    use ScopesQueriesToTenant;
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Product::class);
@@ -25,8 +31,13 @@ class ProductController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $products = Product::query()
-            ->with(['vendor:id,name', 'category:id,name'])
+        $productsQuery = Product::query()->with(['vendor:id,name', 'category:id,name']);
+
+        if (TenantContext::has()) {
+            $productsQuery = $this->scopeProductsForRequest($productsQuery);
+        }
+
+        $products = $productsQuery
             ->when($request->string('search')->toString(), function ($query, string $search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
@@ -41,6 +52,14 @@ class ProductController extends Controller
             ->withQueryString()
             ->through(fn (Product $product): array => ProductResource::make($product, $user));
 
+        $categoriesQuery = ProductCategory::query()->orderBy('name');
+        $vendorsQuery = Vendor::query()->where('is_active', true)->orderBy('name');
+
+        if (TenantContext::has()) {
+            $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
+            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
+        }
+
         return Inertia::render('products/Index', [
             'products' => $products,
             'filters' => [
@@ -48,8 +67,8 @@ class ProductController extends Controller
                 'category_id' => $request->integer('category_id') ?: null,
                 'vendor_id' => $request->integer('vendor_id') ?: null,
             ],
-            'categories' => ProductCategory::query()->orderBy('name')->get(['id', 'name']),
-            'vendors' => Vendor::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'categories' => $categoriesQuery->get(['id', 'name']),
+            'vendors' => $vendorsQuery->get(['id', 'name']),
             'canManage' => $user->can('create', Product::class),
             'canViewCost' => $user->isAdmin(),
         ]);
@@ -59,14 +78,24 @@ class ProductController extends Controller
     {
         $this->authorize('create', Product::class);
 
+        $vendorsQuery = Vendor::query()->where('is_active', true)->orderBy('name');
+        $categoriesQuery = ProductCategory::query()->orderBy('sort_order')->orderBy('name');
+        $relatedOptionsQuery = Product::query()->orderBy('name');
+
+        if (TenantContext::has()) {
+            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
+            $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
+            $relatedOptionsQuery = $this->scopeProductsForRequest($relatedOptionsQuery);
+        }
+
         return Inertia::render('products/Create', [
-            'vendors' => Vendor::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'categories' => ProductCategory::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'vendors' => $vendorsQuery->get(['id', 'name']),
+            'categories' => $categoriesQuery->get(['id', 'name']),
             'units' => collect(UnitOfMeasure::cases())->map(fn (UnitOfMeasure $unit): array => [
                 'value' => $unit->value,
                 'label' => $unit->label(),
             ]),
-            'relatedOptions' => Product::query()->orderBy('name')->get(['id', 'name', 'sku']),
+            'relatedOptions' => $relatedOptionsQuery->get(['id', 'name', 'sku']),
         ]);
     }
 
@@ -78,6 +107,10 @@ class ProductController extends Controller
 
         $data['is_active'] = $request->boolean('is_active', true);
 
+        if (TenantContext::has()) {
+            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
+        }
+
         $product = DB::transaction(function () use ($data, $relatedIds): Product {
             $product = Product::query()->create($data);
             $product->relatedProducts()->sync($relatedIds);
@@ -87,10 +120,10 @@ class ProductController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Product created.')]);
 
-        return to_route('products.show', $product);
+        return redirect()->to(TenantRoute::to('products.show', $product));
     }
 
-    public function show(Product $product): Response
+    public function show(?Organization $organization, Product $product): Response
     {
         $this->authorize('view', $product);
 
@@ -110,31 +143,38 @@ class ProductController extends Controller
         ]);
     }
 
-    public function edit(Product $product): Response
+    public function edit(?Organization $organization, Product $product): Response
     {
         $this->authorize('update', $product);
 
         $product->load('relatedProducts:id');
+
+        $vendorsQuery = Vendor::query()->orderBy('name');
+        $categoriesQuery = ProductCategory::query()->orderBy('sort_order')->orderBy('name');
+        $relatedOptionsQuery = Product::query()->whereKeyNot($product->id)->orderBy('name');
+
+        if (TenantContext::has()) {
+            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
+            $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
+            $relatedOptionsQuery = $this->scopeProductsForRequest($relatedOptionsQuery);
+        }
 
         return Inertia::render('products/Edit', [
             'product' => [
                 ...ProductResource::make($product, request()->user()),
                 'related_product_ids' => $product->relatedProducts->pluck('id'),
             ],
-            'vendors' => Vendor::query()->orderBy('name')->get(['id', 'name']),
-            'categories' => ProductCategory::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'vendors' => $vendorsQuery->get(['id', 'name']),
+            'categories' => $categoriesQuery->get(['id', 'name']),
             'units' => collect(UnitOfMeasure::cases())->map(fn (UnitOfMeasure $unit): array => [
                 'value' => $unit->value,
                 'label' => $unit->label(),
             ]),
-            'relatedOptions' => Product::query()
-                ->whereKeyNot($product->id)
-                ->orderBy('name')
-                ->get(['id', 'name', 'sku']),
+            'relatedOptions' => $relatedOptionsQuery->get(['id', 'name', 'sku']),
         ]);
     }
 
-    public function update(UpdateProductRequest $request, Product $product): RedirectResponse
+    public function update(UpdateProductRequest $request, ?Organization $organization, Product $product): RedirectResponse
     {
         $data = $request->validated();
         $relatedIds = $data['related_product_ids'] ?? [];
@@ -149,10 +189,10 @@ class ProductController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Product updated.')]);
 
-        return to_route('products.show', $product);
+        return redirect()->to(TenantRoute::to('products.show', $product));
     }
 
-    public function destroy(Product $product): RedirectResponse
+    public function destroy(?Organization $organization, Product $product): RedirectResponse
     {
         $this->authorize('delete', $product);
 
@@ -160,6 +200,6 @@ class ProductController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Product deleted.')]);
 
-        return to_route('products.index');
+        return redirect()->to(TenantRoute::to('products.index'));
     }
 }

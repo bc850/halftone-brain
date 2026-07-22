@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import CompanyController from '@/actions/App/Http/Controllers/CompanyController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { edit, index, show } from '@/routes/companies';
+import {
+    index as legacyIndex,
+    show as legacyShow,
+    update as legacyUpdate,
+} from '@/routes/companies';
+import { show as orgShow, update as orgUpdate } from '@/routes/org/companies';
+
+const show = useTenantRoute(legacyShow, orgShow);
+const update = useTenantRoute(legacyUpdate, orgUpdate);
 
 type Option = { value: string; label: string };
 type Person = { id: number; name: string };
@@ -34,7 +42,7 @@ type Company = {
     notes: string | null;
 };
 
-const props = defineProps<{
+defineProps<{
     company: Company;
     salesTaxStatuses: Option[];
     salespeople: Person[];
@@ -49,8 +57,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Companies', href: index() },
-            { title: 'Edit', href: index() },
+            { title: 'Companies', href: legacyIndex() },
+            { title: 'Edit', href: legacyIndex() },
         ],
     },
 });
@@ -60,17 +68,25 @@ defineOptions({
     <Head :title="`Edit ${company.name}`" />
 
     <div class="flex flex-col gap-6 p-4">
-        <Heading :title="`Edit ${company.name}`" description="Update company details" />
+        <Heading
+            :title="`Edit ${company.name}`"
+            description="Update company details"
+        />
 
         <Form
-            v-bind="CompanyController.update.form(company.id)"
+            v-bind="update.form(company.id)"
             class="mx-auto grid w-full max-w-3xl gap-6"
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="grid gap-2 sm:col-span-2">
                     <Label for="name">Company name</Label>
-                    <Input id="name" name="name" :default-value="company.name" required />
+                    <Input
+                        id="name"
+                        name="name"
+                        :default-value="company.name"
+                        required
+                    />
                     <InputError :message="errors.name" />
                 </div>
 
@@ -82,7 +98,11 @@ defineOptions({
                         :class="fieldClass"
                         :value="company.owner_id"
                     >
-                        <option v-for="person in salespeople" :key="person.id" :value="person.id">
+                        <option
+                            v-for="person in salespeople"
+                            :key="person.id"
+                            :value="person.id"
+                        >
                             {{ person.name }}
                         </option>
                     </select>
@@ -111,13 +131,22 @@ defineOptions({
 
                 <div class="grid gap-2">
                     <Label for="email">Email</Label>
-                    <Input id="email" name="email" type="email" :default-value="company.email ?? ''" />
+                    <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        :default-value="company.email ?? ''"
+                    />
                     <InputError :message="errors.email" />
                 </div>
 
                 <div class="grid gap-2">
                     <Label for="phone">Phone</Label>
-                    <Input id="phone" name="phone" :default-value="company.phone ?? ''" />
+                    <Input
+                        id="phone"
+                        name="phone"
+                        :default-value="company.phone ?? ''"
+                    />
                     <InputError :message="errors.phone" />
                 </div>
             </div>
@@ -126,7 +155,9 @@ defineOptions({
                 <h2 class="text-sm font-medium">Billing address</h2>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="billing_address_line1">Address line 1</Label>
+                        <Label for="billing_address_line1"
+                            >Address line 1</Label
+                        >
                         <Input
                             id="billing_address_line1"
                             name="billing_address_line1"
@@ -134,7 +165,9 @@ defineOptions({
                         />
                     </div>
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="billing_address_line2">Address line 2</Label>
+                        <Label for="billing_address_line2"
+                            >Address line 2</Label
+                        >
                         <Input
                             id="billing_address_line2"
                             name="billing_address_line2"
@@ -180,19 +213,27 @@ defineOptions({
                 <h2 class="text-sm font-medium">Shipping address</h2>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="shipping_address_line1">Address line 1</Label>
+                        <Label for="shipping_address_line1"
+                            >Address line 1</Label
+                        >
                         <Input
                             id="shipping_address_line1"
                             name="shipping_address_line1"
-                            :default-value="company.shipping_address_line1 ?? ''"
+                            :default-value="
+                                company.shipping_address_line1 ?? ''
+                            "
                         />
                     </div>
                     <div class="grid gap-2 sm:col-span-2">
-                        <Label for="shipping_address_line2">Address line 2</Label>
+                        <Label for="shipping_address_line2"
+                            >Address line 2</Label
+                        >
                         <Input
                             id="shipping_address_line2"
                             name="shipping_address_line2"
-                            :default-value="company.shipping_address_line2 ?? ''"
+                            :default-value="
+                                company.shipping_address_line2 ?? ''
+                            "
                         />
                     </div>
                     <div class="grid gap-2">
@@ -232,14 +273,19 @@ defineOptions({
 
             <div class="grid gap-2">
                 <Label for="notes">Notes</Label>
-                <textarea id="notes" name="notes" :class="textareaClass">{{
-                    company.notes ?? ''
-                }}</textarea>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    :class="textareaClass"
+                    :value="company.notes ?? ''"
+                />
                 <InputError :message="errors.notes" />
             </div>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Save changes</Button>
+                <Button type="submit" :disabled="processing"
+                    >Save changes</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="show(company.id)">Cancel</Link>
                 </Button>

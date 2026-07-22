@@ -4,8 +4,22 @@ import { Plus } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index, show } from '@/routes/companies';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    show as legacyShow,
+} from '@/routes/companies';
+import {
+    create as orgCreate,
+    index as orgIndex,
+    show as orgShow,
+} from '@/routes/org/companies';
+
+const create = useTenantRoute(legacyCreate, orgCreate);
+const index = useTenantRoute(legacyIndex, orgIndex);
+const show = useTenantRoute(legacyShow, orgShow);
 
 type Company = {
     id: number;
@@ -31,7 +45,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Companies', href: index() },
+            { title: 'Companies', href: legacyIndex() },
         ],
     },
 });
@@ -50,7 +64,9 @@ function onSearch(event: Event) {
     <Head title="Companies" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
             <Heading
                 title="Companies"
                 description="Manage customer companies and accounts"

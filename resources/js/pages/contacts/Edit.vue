@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import ContactController from '@/actions/App/Http/Controllers/ContactController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { edit, index, show } from '@/routes/contacts';
+import {
+    index as legacyIndex,
+    show as legacyShow,
+    update as legacyUpdate,
+} from '@/routes/contacts';
+import { show as orgShow, update as orgUpdate } from '@/routes/org/contacts';
+
+const show = useTenantRoute(legacyShow, orgShow);
+const update = useTenantRoute(legacyUpdate, orgUpdate);
 
 type CompanyOption = { id: number; name: string };
 
@@ -23,7 +31,7 @@ type Contact = {
     notes: string | null;
 };
 
-const props = defineProps<{
+defineProps<{
     contact: Contact;
     companies: CompanyOption[];
 }>();
@@ -37,8 +45,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Contacts', href: index() },
-            { title: 'Edit', href: index() },
+            { title: 'Contacts', href: legacyIndex() },
+            { title: 'Edit', href: legacyIndex() },
         ],
     },
 });
@@ -54,7 +62,7 @@ defineOptions({
         />
 
         <Form
-            v-bind="ContactController.update.form(contact.id)"
+            v-bind="update.form(contact.id)"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
@@ -103,7 +111,11 @@ defineOptions({
 
             <div class="grid gap-2">
                 <Label for="title">Title</Label>
-                <Input id="title" name="title" :default-value="contact.title ?? ''" />
+                <Input
+                    id="title"
+                    name="title"
+                    :default-value="contact.title ?? ''"
+                />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
@@ -118,7 +130,11 @@ defineOptions({
                 </div>
                 <div class="grid gap-2">
                     <Label for="phone">Phone</Label>
-                    <Input id="phone" name="phone" :default-value="contact.phone ?? ''" />
+                    <Input
+                        id="phone"
+                        name="phone"
+                        :default-value="contact.phone ?? ''"
+                    />
                 </div>
             </div>
 
@@ -135,13 +151,18 @@ defineOptions({
 
             <div class="grid gap-2">
                 <Label for="notes">Notes</Label>
-                <textarea id="notes" name="notes" :class="textareaClass">{{
-                    contact.notes ?? ''
-                }}</textarea>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    :class="textareaClass"
+                    :value="contact.notes ?? ''"
+                />
             </div>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Save changes</Button>
+                <Button type="submit" :disabled="processing"
+                    >Save changes</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="show(contact.id)">Cancel</Link>
                 </Button>

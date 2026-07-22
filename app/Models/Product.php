@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
+    'parent_account_id',
     'name',
     'sku',
     'vendor_sku',

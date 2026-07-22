@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Plus } from '@lucide/vue';
-import DealController from '@/actions/App/Http/Controllers/DealController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index, show } from '@/routes/deals';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    show as legacyShow,
+    stage as legacyStage,
+} from '@/routes/deals';
+import {
+    create as orgCreate,
+    index as orgIndex,
+    show as orgShow,
+    stage as orgStage,
+} from '@/routes/org/deals';
+
+const create = useTenantRoute(legacyCreate, orgCreate);
+const index = useTenantRoute(legacyIndex, orgIndex);
+const show = useTenantRoute(legacyShow, orgShow);
+const updateStage = useTenantRoute(legacyStage, orgStage);
 
 type DealCard = {
     id: number;
@@ -15,7 +31,11 @@ type DealCard = {
     amount: string | null;
     company?: { id: number; name: string } | null;
     owner?: { id: number; name: string } | null;
-    primary_contact?: { id: number; first_name: string; last_name: string } | null;
+    primary_contact?: {
+        id: number;
+        first_name: string;
+        last_name: string;
+    } | null;
     can_update: boolean;
     can_delete: boolean;
 };
@@ -47,10 +67,10 @@ function onSearch(event: Event): void {
     );
 }
 
-function moveDeal(dealId: number, stage: string): void {
+function moveDeal(dealId: number, nextStage: string): void {
     router.patch(
-        DealController.updateStage.url(dealId),
-        { stage },
+        updateStage.url(dealId),
+        { stage: nextStage },
         { preserveScroll: true },
     );
 }
@@ -59,7 +79,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Deals', href: index() },
+            { title: 'Deals', href: legacyIndex() },
         ],
     },
 });
@@ -69,8 +89,13 @@ defineOptions({
     <Head title="Deals" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <Heading title="Deals" description="Pipeline board for opportunities" />
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <Heading
+                title="Deals"
+                description="Pipeline board for opportunities"
+            />
             <Button v-if="canCreate" as-child>
                 <Link :href="create()">
                     <Plus class="size-4" />
@@ -94,7 +119,9 @@ defineOptions({
             >
                 <header class="flex items-center justify-between gap-2 px-1">
                     <h2 class="text-sm font-medium">{{ column.label }}</h2>
-                    <span class="text-xs text-muted-foreground">{{ column.deals.length }}</span>
+                    <span class="text-xs text-muted-foreground">{{
+                        column.deals.length
+                    }}</span>
                 </header>
 
                 <div class="flex flex-col gap-2">

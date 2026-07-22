@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
-import ProductController from '@/actions/App/Http/Controllers/ProductController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { index, show } from '@/routes/products';
+import { show as orgShow, update as orgUpdate } from '@/routes/org/products';
+import {
+    index as legacyIndex,
+    show as legacyShow,
+    update as legacyUpdate,
+} from '@/routes/products';
+
+const show = useTenantRoute(legacyShow, orgShow);
+const update = useTenantRoute(legacyUpdate, orgUpdate);
 
 type Option = { id: number; name: string };
 type Unit = { value: string; label: string };
@@ -45,6 +53,7 @@ const markupPercent = ref(String(props.product.markup_percent));
 const suggested = computed(() => {
     const cost = Number(trueCost.value) || 0;
     const markup = Number(markupPercent.value) || 0;
+
     return (cost * (1 + markup / 100)).toFixed(2);
 });
 
@@ -57,8 +66,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Products', href: index() },
-            { title: 'Edit', href: index() },
+            { title: 'Products', href: legacyIndex() },
+            { title: 'Edit', href: legacyIndex() },
         ],
     },
 });
@@ -71,19 +80,29 @@ defineOptions({
         <Heading :title="`Edit ${product.name}`" />
 
         <Form
-            v-bind="ProductController.update.form(product.id)"
+            v-bind="update.form(product.id)"
             class="mx-auto grid w-full max-w-3xl gap-6"
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="grid gap-2 sm:col-span-2">
                     <Label for="name">Name</Label>
-                    <Input id="name" name="name" :default-value="product.name" required />
+                    <Input
+                        id="name"
+                        name="name"
+                        :default-value="product.name"
+                        required
+                    />
                     <InputError :message="errors.name" />
                 </div>
                 <div class="grid gap-2">
                     <Label for="sku">Product SKU</Label>
-                    <Input id="sku" name="sku" :default-value="product.sku" required />
+                    <Input
+                        id="sku"
+                        name="sku"
+                        :default-value="product.sku"
+                        required
+                    />
                     <InputError :message="errors.sku" />
                 </div>
                 <div class="grid gap-2">
@@ -103,7 +122,11 @@ defineOptions({
                         :value="product.vendor_id ?? ''"
                     >
                         <option value="">None</option>
-                        <option v-for="vendor in vendors" :key="vendor.id" :value="vendor.id">
+                        <option
+                            v-for="vendor in vendors"
+                            :key="vendor.id"
+                            :value="vendor.id"
+                        >
                             {{ vendor.name }}
                         </option>
                     </select>
@@ -135,7 +158,11 @@ defineOptions({
                         :value="product.unit_of_measure"
                         required
                     >
-                        <option v-for="unit in units" :key="unit.value" :value="unit.value">
+                        <option
+                            v-for="unit in units"
+                            :key="unit.value"
+                            :value="unit.value"
+                        >
                             {{ unit.label }}
                         </option>
                     </select>
@@ -180,26 +207,36 @@ defineOptions({
                         :default-value="product.list_price ?? ''"
                         :placeholder="suggested"
                     />
-                    <p class="text-xs text-muted-foreground">Suggested: ${{ suggested }}</p>
+                    <p class="text-xs text-muted-foreground">
+                        Suggested: ${{ suggested }}
+                    </p>
                 </div>
             </div>
 
             <div class="grid gap-2">
                 <Label for="description">Description</Label>
-                <textarea id="description" name="description" :class="textareaClass">{{
-                    product.description ?? ''
-                }}</textarea>
+                <textarea
+                    id="description"
+                    name="description"
+                    :class="textareaClass"
+                    :value="product.description ?? ''"
+                />
             </div>
             <div class="grid gap-2">
                 <Label for="notes">Notes</Label>
-                <textarea id="notes" name="notes" :class="textareaClass">{{
-                    product.notes ?? ''
-                }}</textarea>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    :class="textareaClass"
+                    :value="product.notes ?? ''"
+                />
             </div>
 
             <div v-if="relatedOptions.length" class="grid gap-2">
                 <Label>Related products</Label>
-                <div class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                <div
+                    class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3"
+                >
                     <label
                         v-for="option in relatedOptions"
                         :key="option.id"
@@ -210,10 +247,14 @@ defineOptions({
                             name="related_product_ids[]"
                             :value="option.id"
                             class="size-4 rounded border"
-                            :checked="product.related_product_ids.includes(option.id)"
+                            :checked="
+                                product.related_product_ids.includes(option.id)
+                            "
                         />
                         {{ option.name }}
-                        <span class="text-muted-foreground">({{ option.sku }})</span>
+                        <span class="text-muted-foreground"
+                            >({{ option.sku }})</span
+                        >
                     </label>
                 </div>
             </div>
@@ -230,7 +271,9 @@ defineOptions({
             </label>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Save changes</Button>
+                <Button type="submit" :disabled="processing"
+                    >Save changes</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="show(product.id)">Cancel</Link>
                 </Button>

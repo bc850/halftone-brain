@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'name',
+    'parent_account_id',
     'owner_id',
     'phone',
     'email',
@@ -47,11 +48,27 @@ class Company extends Model
     }
 
     /**
+     * @return BelongsTo<ParentAccount, $this>
+     */
+    public function parentAccount(): BelongsTo
+    {
+        return $this->belongsTo(ParentAccount::class);
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * @return HasMany<OrganizationCompany, $this>
+     */
+    public function organizationCompanies(): HasMany
+    {
+        return $this->hasMany(OrganizationCompany::class);
     }
 
     /**

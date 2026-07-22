@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil, Plus } from '@lucide/vue';
-import ContactController from '@/actions/App/Http/Controllers/ContactController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as showCompany } from '@/routes/companies';
-import { edit, index } from '@/routes/contacts';
-import { create as createDeal } from '@/routes/deals';
+import { show as legacyShowCompany } from '@/routes/companies';
+import {
+    destroy as legacyDestroy,
+    edit as legacyEdit,
+    index as legacyIndex,
+} from '@/routes/contacts';
+import { create as legacyCreateDeal } from '@/routes/deals';
+import { show as orgShowCompany } from '@/routes/org/companies';
+import { destroy as orgDestroy, edit as orgEdit } from '@/routes/org/contacts';
+import { create as orgCreateDeal } from '@/routes/org/deals';
+
+const destroy = useTenantRoute(legacyDestroy, orgDestroy);
+const edit = useTenantRoute(legacyEdit, orgEdit);
+const showCompany = useTenantRoute(legacyShowCompany, orgShowCompany);
+const createDeal = useTenantRoute(legacyCreateDeal, orgCreateDeal);
 
 type Contact = {
     id: number;
@@ -27,7 +39,7 @@ const props = defineProps<{
 
 function deleteContact(): void {
     if (confirm('Delete this contact?')) {
-        router.delete(ContactController.destroy.url(props.contact.id));
+        router.delete(destroy.url(props.contact.id));
     }
 }
 
@@ -35,8 +47,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Contacts', href: index() },
-            { title: 'Contact', href: index() },
+            { title: 'Contacts', href: legacyIndex() },
+            { title: 'Contact', href: legacyIndex() },
         ],
     },
 });
@@ -46,7 +58,9 @@ defineOptions({
     <Head :title="`${contact.first_name} ${contact.last_name}`" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
             <Heading
                 :title="`${contact.first_name} ${contact.last_name}`"
                 :description="contact.title ?? undefined"
@@ -58,10 +72,7 @@ defineOptions({
                         Edit
                     </Link>
                 </Button>
-                <Button
-                    v-if="contact.company"
-                    as-child
-                >
+                <Button v-if="contact.company" as-child>
                     <Link
                         :href="
                             createDeal({
@@ -107,7 +118,9 @@ defineOptions({
                     <dd>{{ contact.is_primary ? 'Yes' : 'No' }}</dd>
                 </div>
             </dl>
-            <p v-if="contact.notes" class="text-muted-foreground">{{ contact.notes }}</p>
+            <p v-if="contact.notes" class="text-muted-foreground">
+                {{ contact.notes }}
+            </p>
         </section>
 
         <Button variant="destructive" class="w-fit" @click="deleteContact">

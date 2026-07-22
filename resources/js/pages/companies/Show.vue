@@ -1,13 +1,39 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil, Plus } from '@lucide/vue';
-import CompanyController from '@/actions/App/Http/Controllers/CompanyController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { edit, index } from '@/routes/companies';
-import { create as createContact, show as showContact } from '@/routes/contacts';
-import { create as createDeal, show as showDeal } from '@/routes/deals';
+import {
+    destroy as legacyDestroy,
+    edit as legacyEdit,
+    index as legacyIndex,
+} from '@/routes/companies';
+import {
+    create as legacyCreateContact,
+    show as legacyShowContact,
+} from '@/routes/contacts';
+import {
+    create as legacyCreateDeal,
+    show as legacyShowDeal,
+} from '@/routes/deals';
+import { destroy as orgDestroy, edit as orgEdit } from '@/routes/org/companies';
+import {
+    create as orgCreateContact,
+    show as orgShowContact,
+} from '@/routes/org/contacts';
+import {
+    create as orgCreateDeal,
+    show as orgShowDeal,
+} from '@/routes/org/deals';
+
+const destroy = useTenantRoute(legacyDestroy, orgDestroy);
+const edit = useTenantRoute(legacyEdit, orgEdit);
+const createContact = useTenantRoute(legacyCreateContact, orgCreateContact);
+const showContact = useTenantRoute(legacyShowContact, orgShowContact);
+const createDeal = useTenantRoute(legacyCreateDeal, orgCreateDeal);
+const showDeal = useTenantRoute(legacyShowDeal, orgShowDeal);
 
 type Contact = {
     id: number;
@@ -58,14 +84,16 @@ function formatAddress(
     state: string | null,
     postal: string | null,
 ): string {
-    return [line1, [city, state].filter(Boolean).join(', '), postal]
-        .filter(Boolean)
-        .join(' · ') || '—';
+    return (
+        [line1, [city, state].filter(Boolean).join(', '), postal]
+            .filter(Boolean)
+            .join(' · ') || '—'
+    );
 }
 
 function deleteCompany(): void {
     if (confirm('Delete this company?')) {
-        router.delete(CompanyController.destroy.url(props.company.id));
+        router.delete(destroy.url(props.company.id));
     }
 }
 
@@ -73,8 +101,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Companies', href: index() },
-            { title: 'Company', href: index() },
+            { title: 'Companies', href: legacyIndex() },
+            { title: 'Company', href: legacyIndex() },
         ],
     },
 });
@@ -84,10 +112,14 @@ defineOptions({
     <Head :title="company.name" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
             <Heading
                 :title="company.name"
-                :description="company.owner ? `Owned by ${company.owner.name}` : undefined"
+                :description="
+                    company.owner ? `Owned by ${company.owner.name}` : undefined
+                "
             />
             <div class="flex flex-wrap gap-2">
                 <Button variant="outline" as-child>
@@ -97,13 +129,21 @@ defineOptions({
                     </Link>
                 </Button>
                 <Button variant="outline" as-child>
-                    <Link :href="createContact({ query: { company_id: company.id } })">
+                    <Link
+                        :href="
+                            createContact({ query: { company_id: company.id } })
+                        "
+                    >
                         <Plus class="size-4" />
                         Contact
                     </Link>
                 </Button>
                 <Button as-child>
-                    <Link :href="createDeal({ query: { company_id: company.id } })">
+                    <Link
+                        :href="
+                            createDeal({ query: { company_id: company.id } })
+                        "
+                    >
                         <Plus class="size-4" />
                         Deal
                     </Link>
@@ -125,7 +165,9 @@ defineOptions({
                     </div>
                     <div class="flex justify-between gap-4">
                         <dt class="text-muted-foreground">Tax status</dt>
-                        <dd class="capitalize">{{ company.sales_tax_status }}</dd>
+                        <dd class="capitalize">
+                            {{ company.sales_tax_status }}
+                        </dd>
                     </div>
                     <div class="flex justify-between gap-4">
                         <dt class="text-muted-foreground">Billing</dt>
@@ -154,7 +196,9 @@ defineOptions({
                         </dd>
                     </div>
                 </dl>
-                <p v-if="company.notes" class="text-sm text-muted-foreground">{{ company.notes }}</p>
+                <p v-if="company.notes" class="text-sm text-muted-foreground">
+                    {{ company.notes }}
+                </p>
             </section>
 
             <section class="space-y-3 rounded-xl border p-4">
@@ -166,7 +210,10 @@ defineOptions({
                         class="flex items-center justify-between gap-3 py-2"
                     >
                         <div class="min-w-0">
-                            <Link :href="showContact(contact.id)" class="hover:underline">
+                            <Link
+                                :href="showContact(contact.id)"
+                                class="hover:underline"
+                            >
                                 {{ contact.first_name }} {{ contact.last_name }}
                                 <span
                                     v-if="contact.is_primary"
@@ -178,7 +225,12 @@ defineOptions({
                                 {{ contact.email ?? contact.phone ?? '—' }}
                             </p>
                         </div>
-                        <Button v-if="canCreateDeal" variant="outline" size="sm" as-child>
+                        <Button
+                            v-if="canCreateDeal"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                        >
                             <Link
                                 :href="
                                     createDeal({
@@ -207,7 +259,13 @@ defineOptions({
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="font-medium">Deals</h2>
                     <Button v-if="canCreateDeal" size="sm" as-child>
-                        <Link :href="createDeal({ query: { company_id: company.id } })">
+                        <Link
+                            :href="
+                                createDeal({
+                                    query: { company_id: company.id },
+                                })
+                            "
+                        >
                             <Plus class="size-3.5" />
                             New deal
                         </Link>
@@ -223,17 +281,26 @@ defineOptions({
                             {{ deal.name }}
                         </Link>
                         <div class="flex gap-4 text-muted-foreground">
-                            <span class="capitalize">{{ deal.stage.replaceAll('_', ' ') }}</span>
-                            <span>{{ deal.amount ? `$${deal.amount}` : '—' }}</span>
+                            <span class="capitalize">{{
+                                deal.stage.replaceAll('_', ' ')
+                            }}</span>
+                            <span>{{
+                                deal.amount ? `$${deal.amount}` : '—'
+                            }}</span>
                         </div>
                     </li>
-                    <li v-if="company.deals.length === 0" class="py-4 text-muted-foreground">
+                    <li
+                        v-if="company.deals.length === 0"
+                        class="py-4 text-muted-foreground"
+                    >
                         No deals yet.
                     </li>
                 </ul>
             </section>
         </div>
 
-        <Button variant="destructive" @click="deleteCompany">Delete company</Button>
+        <Button variant="destructive" @click="deleteCompany"
+            >Delete company</Button
+        >
     </div>
 </template>

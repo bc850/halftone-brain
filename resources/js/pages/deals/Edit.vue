@@ -1,13 +1,27 @@
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
-import DealController from '@/actions/App/Http/Controllers/DealController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { edit, index, show } from '@/routes/deals';
+import {
+    edit as legacyEdit,
+    index as legacyIndex,
+    show as legacyShow,
+    update as legacyUpdate,
+} from '@/routes/deals';
+import {
+    edit as orgEdit,
+    show as orgShow,
+    update as orgUpdate,
+} from '@/routes/org/deals';
+
+const edit = useTenantRoute(legacyEdit, orgEdit);
+const show = useTenantRoute(legacyShow, orgShow);
+const update = useTenantRoute(legacyUpdate, orgUpdate);
 
 type Option = { value: string; label: string };
 type Person = { id: number; name: string };
@@ -58,8 +72,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Deals', href: index() },
-            { title: 'Edit', href: index() },
+            { title: 'Deals', href: legacyIndex() },
+            { title: 'Edit', href: legacyIndex() },
         ],
     },
 });
@@ -69,16 +83,24 @@ defineOptions({
     <Head :title="`Edit ${deal.name}`" />
 
     <div class="flex flex-col gap-6 p-4">
-        <Heading :title="`Edit ${deal.name}`" description="Update opportunity details" />
+        <Heading
+            :title="`Edit ${deal.name}`"
+            description="Update opportunity details"
+        />
 
         <Form
-            v-bind="DealController.update.form(deal.id)"
+            v-bind="update.form(deal.id)"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
                 <Label for="name">Deal name</Label>
-                <Input id="name" name="name" :default-value="deal.name" required />
+                <Input
+                    id="name"
+                    name="name"
+                    :default-value="deal.name"
+                    required
+                />
                 <InputError :message="errors.name" />
             </div>
 
@@ -112,7 +134,11 @@ defineOptions({
                     :value="deal.primary_contact_id ?? ''"
                 >
                     <option value="">None</option>
-                    <option v-for="contact in contacts" :key="contact.id" :value="contact.id">
+                    <option
+                        v-for="contact in contacts"
+                        :key="contact.id"
+                        :value="contact.id"
+                    >
                         {{ contact.first_name }} {{ contact.last_name }}
                     </option>
                 </select>
@@ -141,7 +167,13 @@ defineOptions({
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="grid gap-2">
                     <Label for="stage">Stage</Label>
-                    <select id="stage" name="stage" :class="fieldClass" :value="deal.stage" required>
+                    <select
+                        id="stage"
+                        name="stage"
+                        :class="fieldClass"
+                        :value="deal.stage"
+                        required
+                    >
                         <option
                             v-for="stage in stages"
                             :key="stage.value"
@@ -171,7 +203,9 @@ defineOptions({
                         id="expected_close_date"
                         name="expected_close_date"
                         type="date"
-                        :default-value="deal.expected_close_date?.slice(0, 10) ?? ''"
+                        :default-value="
+                            deal.expected_close_date?.slice(0, 10) ?? ''
+                        "
                     />
                 </div>
                 <div v-if="salespeople.length" class="grid gap-2">
@@ -195,13 +229,18 @@ defineOptions({
 
             <div class="grid gap-2">
                 <Label for="notes">Notes</Label>
-                <textarea id="notes" name="notes" :class="textareaClass">{{
-                    deal.notes ?? ''
-                }}</textarea>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    :class="textareaClass"
+                    :value="deal.notes ?? ''"
+                />
             </div>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Save changes</Button>
+                <Button type="submit" :disabled="processing"
+                    >Save changes</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="show(deal.id)">Cancel</Link>
                 </Button>

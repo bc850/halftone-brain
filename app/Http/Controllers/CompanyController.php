@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\SalesTaxStatus;
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreCompanyRequest;
 use App\Http\Requests\UpdateCompanyRequest;
 use App\Models\Company;
 use App\Models\Deal;
+use App\Models\Organization;
+use App\Models\OrganizationCompany;
 use App\Models\User;
+use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantRoute;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,6 +21,8 @@ use Inertia\Response;
 
 class CompanyController extends Controller
 {
+    use ScopesQueriesToTenant;
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Company::class);
@@ -23,10 +30,15 @@ class CompanyController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $companies = Company::query()
-            ->visibleTo($user)
-            ->with('owner:id,name')
-            ->withCount(['contacts', 'deals'])
+        $companiesQuery = Company::query()->with('owner:id,name')->withCount(['contacts', 'deals']);
+
+        if (TenantContext::has()) {
+            $companiesQuery = $this->scopeCompaniesForRequest($companiesQuery);
+        } else {
+            $companiesQuery->visibleTo($user);
+        }
+
+        $companies = $companiesQuery
             ->when($request->string('search')->toString(), function ($query, string $search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
@@ -76,14 +88,30 @@ class CompanyController extends Controller
             ? $data['owner_id']
             : $user->id;
 
+        if (TenantContext::has()) {
+            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
+        }
+
         $company = Company::query()->create($data);
+
+        if (TenantContext::has()) {
+            $tenant = TenantContext::get();
+            OrganizationCompany::query()->create([
+                'organization_id' => $tenant->organizationId,
+                'company_id' => $company->id,
+                'parent_account_id' => $tenant->parentAccountId,
+                'lifecycle_status' => 'prospect',
+                'relationship_status' => 'new',
+                'tax_posture' => 'unknown',
+            ]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Company created.')]);
 
-        return to_route('companies.show', $company);
+        return redirect()->to(TenantRoute::to('companies.show', $company));
     }
 
-    public function show(Request $request, Company $company): Response
+    public function show(Request $request, ?Organization $organization, Company $company): Response
     {
         $this->authorize('view', $company);
 
@@ -104,7 +132,7 @@ class CompanyController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Company $company): Response
+    public function edit(Request $request, ?Organization $organization, Company $company): Response
     {
         $this->authorize('update', $company);
 
@@ -126,16 +154,16 @@ class CompanyController extends Controller
         ]);
     }
 
-    public function update(UpdateCompanyRequest $request, Company $company): RedirectResponse
+    public function update(UpdateCompanyRequest $request, ?Organization $organization, Company $company): RedirectResponse
     {
         $company->update($request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Company updated.')]);
 
-        return to_route('companies.show', $company);
+        return redirect()->to(TenantRoute::to('companies.show', $company));
     }
 
-    public function destroy(Company $company): RedirectResponse
+    public function destroy(?Organization $organization, Company $company): RedirectResponse
     {
         $this->authorize('delete', $company);
 
@@ -143,6 +171,6 @@ class CompanyController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Company deleted.')]);
 
-        return to_route('companies.index');
+        return redirect()->to(TenantRoute::to('companies.index'));
     }
 }

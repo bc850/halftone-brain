@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil } from '@lucide/vue';
-import VendorController from '@/actions/App/Http/Controllers/VendorController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as showProduct } from '@/routes/products';
-import { edit, index } from '@/routes/vendors';
+import { show as orgShowProduct } from '@/routes/org/products';
+import { destroy as orgDestroy, edit as orgEdit } from '@/routes/org/vendors';
+import { show as legacyShowProduct } from '@/routes/products';
+import {
+    destroy as legacyDestroy,
+    edit as legacyEdit,
+    index as legacyIndex,
+} from '@/routes/vendors';
+
+const destroy = useTenantRoute(legacyDestroy, orgDestroy);
+const edit = useTenantRoute(legacyEdit, orgEdit);
+const showProduct = useTenantRoute(legacyShowProduct, orgShowProduct);
 
 type Product = {
     id: number;
@@ -34,7 +44,7 @@ const props = defineProps<{
 
 function deleteVendor(): void {
     if (confirm('Delete this vendor?')) {
-        router.delete(VendorController.destroy.url(props.vendor.id));
+        router.delete(destroy.url(props.vendor.id));
     }
 }
 
@@ -42,8 +52,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Vendors', href: index() },
-            { title: 'Vendor', href: index() },
+            { title: 'Vendors', href: legacyIndex() },
+            { title: 'Vendor', href: legacyIndex() },
         ],
     },
 });
@@ -53,10 +63,14 @@ defineOptions({
     <Head :title="vendor.name" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
             <Heading
                 :title="vendor.name"
-                :description="vendor.is_active ? 'Active vendor' : 'Inactive vendor'"
+                :description="
+                    vendor.is_active ? 'Active vendor' : 'Inactive vendor'
+                "
             />
             <Button v-if="canManage" variant="outline" as-child>
                 <Link :href="edit(vendor.id)">
@@ -66,7 +80,10 @@ defineOptions({
             </Button>
         </div>
 
-        <section v-if="canViewDetails" class="max-w-xl space-y-2 rounded-xl border p-4 text-sm">
+        <section
+            v-if="canViewDetails"
+            class="max-w-xl space-y-2 rounded-xl border p-4 text-sm"
+        >
             <div class="flex justify-between gap-4">
                 <span class="text-muted-foreground">Account #</span>
                 <span>{{ vendor.account_number ?? '—' }}</span>
@@ -83,7 +100,9 @@ defineOptions({
                 <span class="text-muted-foreground">Website</span>
                 <span>{{ vendor.website ?? '—' }}</span>
             </div>
-            <p v-if="vendor.notes" class="pt-2 text-muted-foreground">{{ vendor.notes }}</p>
+            <p v-if="vendor.notes" class="pt-2 text-muted-foreground">
+                {{ vendor.notes }}
+            </p>
         </section>
 
         <section class="space-y-3 rounded-xl border p-4">
@@ -94,12 +113,18 @@ defineOptions({
                     :key="product.id"
                     class="flex justify-between gap-3 py-2"
                 >
-                    <Link :href="showProduct(product.id)" class="hover:underline">
+                    <Link
+                        :href="showProduct(product.id)"
+                        class="hover:underline"
+                    >
                         {{ product.name }}
                     </Link>
                     <span class="text-muted-foreground">{{ product.sku }}</span>
                 </li>
-                <li v-if="vendor.products.length === 0" class="py-4 text-muted-foreground">
+                <li
+                    v-if="vendor.products.length === 0"
+                    class="py-4 text-muted-foreground"
+                >
                     No products linked.
                 </li>
             </ul>

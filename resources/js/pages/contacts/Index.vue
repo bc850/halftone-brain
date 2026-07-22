@@ -4,9 +4,25 @@ import { Plus } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { create, index, show } from '@/routes/contacts';
-import { create as createDeal } from '@/routes/deals';
+import {
+    create as legacyCreate,
+    index as legacyIndex,
+    show as legacyShow,
+} from '@/routes/contacts';
+import { create as legacyCreateDeal } from '@/routes/deals';
+import {
+    create as orgCreate,
+    index as orgIndex,
+    show as orgShow,
+} from '@/routes/org/contacts';
+import { create as orgCreateDeal } from '@/routes/org/deals';
+
+const create = useTenantRoute(legacyCreate, orgCreate);
+const index = useTenantRoute(legacyIndex, orgIndex);
+const show = useTenantRoute(legacyShow, orgShow);
+const createDeal = useTenantRoute(legacyCreateDeal, orgCreateDeal);
 
 type Contact = {
     id: number;
@@ -40,7 +56,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Contacts', href: index() },
+            { title: 'Contacts', href: legacyIndex() },
         ],
     },
 });
@@ -50,8 +66,13 @@ defineOptions({
     <Head title="Contacts" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <Heading title="Contacts" description="People at your customer companies" />
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <Heading
+                title="Contacts"
+                description="People at your customer companies"
+            />
             <Button as-child>
                 <Link :href="create()">
                     <Plus class="size-4" />
@@ -125,7 +146,10 @@ defineOptions({
                         </td>
                     </tr>
                     <tr v-if="contacts.data.length === 0">
-                        <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
+                        <td
+                            colspan="5"
+                            class="px-4 py-8 text-center text-muted-foreground"
+                        >
                             No contacts yet.
                         </td>
                     </tr>

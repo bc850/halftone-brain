@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import ProductCategoryController from '@/actions/App/Http/Controllers/ProductCategoryController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { index, show } from '@/routes/categories';
+import {
+    index as legacyIndex,
+    show as legacyShow,
+    update as legacyUpdate,
+} from '@/routes/categories';
+import { show as orgShow, update as orgUpdate } from '@/routes/org/categories';
+
+const show = useTenantRoute(legacyShow, orgShow);
+const update = useTenantRoute(legacyUpdate, orgUpdate);
 
 type Category = {
     id: number;
@@ -28,8 +36,8 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Categories', href: index() },
-            { title: 'Edit', href: index() },
+            { title: 'Categories', href: legacyIndex() },
+            { title: 'Edit', href: legacyIndex() },
         ],
     },
 });
@@ -42,13 +50,18 @@ defineOptions({
         <Heading :title="`Edit ${category.name}`" />
 
         <Form
-            v-bind="ProductCategoryController.update.form(category.id)"
+            v-bind="update.form(category.id)"
             class="mx-auto grid w-full max-w-xl gap-4"
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
                 <Label for="name">Name</Label>
-                <Input id="name" name="name" :default-value="category.name" required />
+                <Input
+                    id="name"
+                    name="name"
+                    :default-value="category.name"
+                    required
+                />
                 <InputError :message="errors.name" />
             </div>
             <div class="grid gap-2">
@@ -68,12 +81,17 @@ defineOptions({
             </div>
             <div class="grid gap-2">
                 <Label for="description">Description</Label>
-                <textarea id="description" name="description" :class="textareaClass">{{
-                    category.description ?? ''
-                }}</textarea>
+                <textarea
+                    id="description"
+                    name="description"
+                    :class="textareaClass"
+                    :value="category.description ?? ''"
+                />
             </div>
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing">Save changes</Button>
+                <Button type="submit" :disabled="processing"
+                    >Save changes</Button
+                >
                 <Button variant="outline" as-child>
                     <Link :href="show(category.id)">Cancel</Link>
                 </Button>
