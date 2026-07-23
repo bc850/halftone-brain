@@ -32,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureTenantRouteBindings();
 
         $this->app->terminating(function (): void {
-            TenantContext::reset();
+            TenantContext::clear();
         });
     }
 

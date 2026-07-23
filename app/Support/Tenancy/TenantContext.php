@@ -8,6 +8,7 @@ use RuntimeException;
 
 /**
  * Request-scoped tenant state. Set once per request; rejects accidental reassignment.
+ * Cleared at the end of each organization request (and defensively at the start).
  */
 final class TenantContext
 {
@@ -80,11 +81,20 @@ final class TenantContext
     }
 
     /**
-     * Test-only reset between Pest cases / HTTP kernel cycles.
+     * Fully remove request-scoped tenant state (parent, organization, memberships, permissions).
+     * Safe for production Octane / queue / long-running PHP processes.
+     */
+    public static function clear(): void
+    {
+        self::$instance = null;
+    }
+
+    /**
+     * Alias of clear() for test setUp and terminating callbacks.
      */
     public static function reset(): void
     {
-        self::$instance = null;
+        self::clear();
     }
 
     public function canOrg(string $permission): bool

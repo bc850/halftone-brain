@@ -12,7 +12,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        TenantContext::reset();
+        TenantContext::clear();
     }
 
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void
