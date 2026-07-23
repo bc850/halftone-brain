@@ -227,7 +227,9 @@ test('running the command twice produces no duplicate records', function () {
         ->and(Role::query()->count())->toBe(count(RbacDefinitions::systemRoles()))
         ->and(Permission::query()->count())->toBe(count(RbacDefinitions::permissions()))
         ->and(DB::table('parent_account_membership_role')->count())->toBe(1)
-        ->and(DB::table('membership_role')->count())->toBe(2);
+        ->and(DB::table('membership_role')->count())->toBe(2)
+        ->and(DB::table('number_sequences')->count())->toBe(4)
+        ->and(DB::table('audit_events')->count())->toBe(2);
 });
 
 test('transaction rollback removes all partial writes after induced failure', function () {
@@ -246,7 +248,9 @@ test('transaction rollback removes all partial writes after induced failure', fu
         ->and(ParentAccountMembership::query()->count())->toBe(0)
         ->and(Role::query()->count())->toBe(0)
         ->and(Permission::query()->count())->toBe(0)
-        ->and(DB::table('role_permission')->count())->toBe(0);
+        ->and(DB::table('role_permission')->count())->toBe(0)
+        ->and(DB::table('number_sequences')->count())->toBe(0)
+        ->and(DB::table('audit_events')->count())->toBe(0);
 });
 
 test('unexpected business data causes the command to refuse execution', function () {
@@ -263,7 +267,7 @@ test('unexpected business data causes the command to refuse execution', function
         ->and(Role::query()->count())->toBe(0);
 });
 
-test('bootstrap creates no customer product deal team org-company audit or sequence placeholders', function () {
+test('bootstrap creates no customer product deal team or organization-company placeholders', function () {
     User::factory()->create([
         'email' => 'owner@example.com',
         'email_verified_at' => now(),
@@ -279,6 +283,6 @@ test('bootstrap creates no customer product deal team org-company audit or seque
         ->and(DB::table('deals')->count())->toBe(0)
         ->and(DB::table('teams')->count())->toBe(0)
         ->and(DB::table('organization_companies')->count())->toBe(0)
-        ->and(DB::table('audit_events')->count())->toBe(0)
-        ->and(DB::table('number_sequences')->count())->toBe(0);
+        ->and(DB::table('number_sequences')->count())->toBe(4)
+        ->and(DB::table('audit_events')->count())->toBe(2);
 });

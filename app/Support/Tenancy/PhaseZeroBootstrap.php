@@ -4,14 +4,18 @@ namespace App\Support\Tenancy;
 
 use App\Enums\MembershipStatus;
 use App\Enums\RoleScope;
+use App\Models\AuditEvent;
 use App\Models\Membership;
+use App\Models\NumberSequence;
 use App\Models\Organization;
 use App\Models\ParentAccount;
 use App\Models\ParentAccountMembership;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Audit\Auditor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -20,11 +24,15 @@ final class PhaseZeroBootstrap
 {
     public const LOCK_KEY = 'halftone_phase_zero_bootstrap';
 
+    public const COMPLETION_ACTION = 'phase0.backfill.completed';
+
     /**
      * @param  list<array{name: string, slug: string}>  $organizations
+     * @param  array<string, array{customer: array{prefix: string, pad_length: int}, deal: array{prefix: string, pad_length: int}}>  $sequenceDefinitions
      */
     public function __construct(
         private RoleAssigner $roleAssigner,
+        private Auditor $auditor,
         private string $userEmail = 'brandon@pelicansigns.com',
         private string $parentName = 'Halftone Brain',
         private string $parentSlug = 'halftone-brain',
@@ -34,6 +42,16 @@ final class PhaseZeroBootstrap
         ],
         private string $parentRoleKey = 'parent_owner',
         private string $organizationRoleKey = 'owner',
+        private array $sequenceDefinitions = [
+            'pelican-signs' => [
+                'customer' => ['prefix' => 'PEL-C-', 'pad_length' => 5],
+                'deal' => ['prefix' => 'PEL-D-', 'pad_length' => 5],
+            ],
+            'brim-drinkware' => [
+                'customer' => ['prefix' => 'BRIM-C-', 'pad_length' => 5],
+                'deal' => ['prefix' => 'BRIM-D-', 'pad_length' => 5],
+            ],
+        ],
     ) {}
 
     /**
@@ -88,6 +106,9 @@ final class PhaseZeroBootstrap
                     $this->upsertOrganizationMembership($organization, $user, $summary);
                 }
 
+                $this->upsertNumberSequences($organizations, $summary);
+                $this->appendCompletionAudits($parent, $organizations, $summary);
+
                 if (app()->bound('phaseZeroBootstrap.induceFailure') && app('phaseZeroBootstrap.induceFailure') === true) {
                     throw new RuntimeException('Induced bootstrap failure for transaction rollback testing.');
                 }
@@ -120,7 +141,231 @@ final class PhaseZeroBootstrap
         foreach ($this->organizations as $organization) {
             $summary[] = $this->line('proposed', 'organization_membership', $organization['slug'], 'owner via RoleAssigner');
         }
+        $this->planSequences($summary);
+        $this->planCompletionAudits($summary);
         $summary[] = $this->line('proposed', 'backfill', 'crm_catalog', 'verified no-op (business tables empty)');
+    }
+
+    /**
+     * @param  list<array{action: string, type: string, key: string, detail: string}>  $summary
+     */
+    private function planSequences(array &$summary): void
+    {
+        foreach ($this->organizations as $organization) {
+            $definitions = $this->sequenceDefinitions[$organization['slug']] ?? null;
+
+            if ($definitions === null) {
+                throw new RuntimeException("Missing sequence definitions for organization [{$organization['slug']}].");
+            }
+
+            $existingOrg = Organization::query()->where('slug', $organization['slug'])->first();
+
+            foreach ($definitions as $key => $definition) {
+                if ($existingOrg === null) {
+                    $summary[] = $this->line(
+                        'proposed',
+                        'number_sequence',
+                        $organization['slug'].':'.$key,
+                        $definition['prefix'].str_pad('1', $definition['pad_length'], '0', STR_PAD_LEFT),
+                    );
+
+                    continue;
+                }
+
+                $existing = NumberSequence::query()
+                    ->where('organization_id', $existingOrg->id)
+                    ->where('sequence_key', $key)
+                    ->first();
+
+                if ($existing === null) {
+                    $summary[] = $this->line(
+                        'proposed',
+                        'number_sequence',
+                        $organization['slug'].':'.$key,
+                        $definition['prefix'].str_pad('1', $definition['pad_length'], '0', STR_PAD_LEFT),
+                    );
+
+                    continue;
+                }
+
+                if ($existing->prefix !== $definition['prefix'] || $existing->pad_length !== $definition['pad_length']) {
+                    $summary[] = $this->line(
+                        'conflicting',
+                        'number_sequence',
+                        $organization['slug'].':'.$key,
+                        "existing {$existing->prefix}/{$existing->pad_length}",
+                    );
+
+                    throw new RuntimeException(
+                        "Conflicting number sequence [{$key}] for [{$organization['slug']}].",
+                    );
+                }
+
+                $summary[] = $this->line(
+                    'existing',
+                    'number_sequence',
+                    $organization['slug'].':'.$key,
+                    "next_number={$existing->next_number}",
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  list<array{action: string, type: string, key: string, detail: string}>  $summary
+     */
+    private function planCompletionAudits(array &$summary): void
+    {
+        $parent = ParentAccount::query()->where('slug', $this->parentSlug)->first();
+
+        foreach ($this->organizations as $organization) {
+            $existingOrg = Organization::query()->where('slug', $organization['slug'])->first();
+
+            if ($parent === null || $existingOrg === null) {
+                $summary[] = $this->line('proposed', 'audit_event', self::COMPLETION_ACTION, $organization['slug']);
+
+                continue;
+            }
+
+            $existing = AuditEvent::query()
+                ->where('action', self::COMPLETION_ACTION)
+                ->where('parent_account_id', $parent->id)
+                ->where('organization_id', $existingOrg->id)
+                ->first();
+
+            if ($existing === null) {
+                $summary[] = $this->line('proposed', 'audit_event', self::COMPLETION_ACTION, $organization['slug']);
+
+                continue;
+            }
+
+            if ($existing->parent_account_id !== $parent->id || $existing->organization_id !== $existingOrg->id) {
+                throw new RuntimeException("Conflicting completion audit for [{$organization['slug']}].");
+            }
+
+            $summary[] = $this->line('existing', 'audit_event', self::COMPLETION_ACTION, $organization['slug']);
+        }
+    }
+
+    /**
+     * @param  list<Organization>  $organizations
+     * @param  list<array{action: string, type: string, key: string, detail: string}>  $summary
+     */
+    private function upsertNumberSequences(array $organizations, array &$summary): void
+    {
+        foreach ($organizations as $organization) {
+            $definitions = $this->sequenceDefinitions[$organization->slug] ?? null;
+
+            if ($definitions === null) {
+                throw new RuntimeException("Missing sequence definitions for organization [{$organization->slug}].");
+            }
+
+            foreach ($definitions as $key => $definition) {
+                $existing = NumberSequence::query()
+                    ->where('organization_id', $organization->id)
+                    ->where('sequence_key', $key)
+                    ->first();
+
+                if ($existing === null) {
+                    NumberSequence::query()->create([
+                        'organization_id' => $organization->id,
+                        'sequence_key' => $key,
+                        'prefix' => $definition['prefix'],
+                        'next_number' => 1,
+                        'pad_length' => $definition['pad_length'],
+                    ]);
+                    $summary[] = $this->line(
+                        'created',
+                        'number_sequence',
+                        $organization->slug.':'.$key,
+                        $definition['prefix'].str_pad('1', $definition['pad_length'], '0', STR_PAD_LEFT),
+                    );
+
+                    continue;
+                }
+
+                if ($existing->prefix !== $definition['prefix'] || $existing->pad_length !== $definition['pad_length']) {
+                    throw new RuntimeException(
+                        "Conflicting number sequence [{$key}] for [{$organization->slug}]: refusing to rewrite prefix/padding.",
+                    );
+                }
+
+                $summary[] = $this->line(
+                    'existing',
+                    'number_sequence',
+                    $organization->slug.':'.$key,
+                    "next_number={$existing->next_number}",
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  list<Organization>  $organizations
+     * @param  list<array{action: string, type: string, key: string, detail: string}>  $summary
+     */
+    private function appendCompletionAudits(ParentAccount $parent, array $organizations, array &$summary): void
+    {
+        $correlationId = (string) Str::uuid();
+
+        foreach ($organizations as $organization) {
+            $existing = AuditEvent::query()
+                ->where('action', self::COMPLETION_ACTION)
+                ->where('parent_account_id', $parent->id)
+                ->where('organization_id', $organization->id)
+                ->get();
+
+            if ($existing->count() > 1) {
+                throw new RuntimeException("Multiple completion audits found for [{$organization->slug}].");
+            }
+
+            if ($existing->count() === 1) {
+                $event = $existing->first();
+
+                if ($event->parent_account_id !== $parent->id || $event->organization_id !== $organization->id) {
+                    throw new RuntimeException("Conflicting completion audit for [{$organization->slug}].");
+                }
+
+                $summary[] = $this->line('existing', 'audit_event', self::COMPLETION_ACTION, $organization->slug);
+
+                continue;
+            }
+
+            $this->auditor->append(
+                parentAccount: $parent,
+                action: self::COMPLETION_ACTION,
+                subjectType: Organization::class,
+                subjectId: $organization->id,
+                organization: $organization,
+                actor: null,
+                before: null,
+                after: [
+                    'checkpoint' => '0C-3',
+                    'parent' => [
+                        'name' => $parent->name,
+                        'slug' => $parent->slug,
+                    ],
+                    'organization' => [
+                        'name' => $organization->name,
+                        'slug' => $organization->slug,
+                    ],
+                    'counts' => [
+                        'parent_accounts' => ParentAccount::query()->count(),
+                        'organizations' => Organization::query()->count(),
+                        'memberships' => Membership::query()->count(),
+                        'parent_account_memberships' => ParentAccountMembership::query()->count(),
+                        'roles' => Role::query()->count(),
+                        'permissions' => Permission::query()->count(),
+                        'number_sequences' => NumberSequence::query()->count(),
+                    ],
+                ],
+                ip: null,
+                userAgent: null,
+                correlationId: $correlationId,
+            );
+
+            $summary[] = $this->line('created', 'audit_event', self::COMPLETION_ACTION, $organization->slug);
+        }
     }
 
     /**
@@ -368,8 +613,6 @@ final class PhaseZeroBootstrap
             'teams',
             'team_user',
             'organization_companies',
-            'audit_events',
-            'number_sequences',
             'team_memberships',
         ];
 

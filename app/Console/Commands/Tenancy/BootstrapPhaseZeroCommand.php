@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Tenancy;
 
+use App\Support\Audit\Auditor;
 use App\Support\Tenancy\PhaseZeroBootstrap;
 use App\Support\Tenancy\RoleAssigner;
 use Illuminate\Console\Attributes\Description;
@@ -20,7 +21,7 @@ use Throwable;
 #[Description('Idempotent checkpoint 0C tenant/RBAC bootstrap (dry-run by default)')]
 class BootstrapPhaseZeroCommand extends Command
 {
-    public function handle(RoleAssigner $roleAssigner): int
+    public function handle(RoleAssigner $roleAssigner, Auditor $auditor): int
     {
         $dryRun = ! (bool) $this->option('execute');
         $confirmedDatabase = (string) $this->option('confirm-database');
@@ -33,6 +34,7 @@ class BootstrapPhaseZeroCommand extends Command
 
             $bootstrap = new PhaseZeroBootstrap(
                 roleAssigner: $roleAssigner,
+                auditor: $auditor,
                 userEmail: (string) $this->option('user-email'),
                 parentName: (string) $this->option('parent-name'),
                 parentSlug: (string) $this->option('parent-slug'),
