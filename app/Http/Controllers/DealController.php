@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\DealStage;
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreDealRequest;
 use App\Http\Requests\UpdateDealRequest;
@@ -26,6 +27,7 @@ use Inertia\Response;
 
 class DealController extends Controller
 {
+    use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
     public function index(Request $request): Response
@@ -154,6 +156,8 @@ class DealController extends Controller
 
     public function store(StoreDealRequest $request): RedirectResponse
     {
+        $tenant = $this->requireTenantContext();
+
         /** @var User $user */
         $user = $request->user();
         $data = $request->validated();
@@ -164,19 +168,16 @@ class DealController extends Controller
             ? $data['owner_id']
             : $user->id;
 
-        if (TenantContext::has()) {
-            $tenant = TenantContext::get();
-            $data['organization_id'] = $tenant->organizationId;
-            $data['parent_account_id'] = $tenant->parentAccountId;
+        $data['organization_id'] = $tenant->organizationId;
+        $data['parent_account_id'] = $tenant->parentAccountId;
 
-            $organizationCompany = OrganizationCompany::query()
-                ->where('organization_id', $tenant->organizationId)
-                ->where('company_id', $data['company_id'])
-                ->first();
+        $organizationCompany = OrganizationCompany::query()
+            ->where('organization_id', $tenant->organizationId)
+            ->where('company_id', $data['company_id'])
+            ->first();
 
-            if ($organizationCompany !== null) {
-                $data['organization_company_id'] = $organizationCompany->id;
-            }
+        if ($organizationCompany !== null) {
+            $data['organization_company_id'] = $organizationCompany->id;
         }
 
         $deal = DB::transaction(function () use ($data, $contactIds): Deal {
@@ -262,6 +263,8 @@ class DealController extends Controller
 
     public function update(UpdateDealRequest $request, ?Organization $organization, Deal $deal): RedirectResponse
     {
+        $this->requireTenantContext();
+
         $data = $request->validated();
         $contactIds = $data['contact_ids'] ?? [];
         unset($data['contact_ids']);
@@ -283,6 +286,7 @@ class DealController extends Controller
 
     public function destroy(?Organization $organization, Deal $deal): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('delete', $deal);
 
         $deal->delete();
@@ -294,6 +298,7 @@ class DealController extends Controller
 
     public function updateStage(Request $request, ?Organization $organization, Deal $deal): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('update', $deal);
 
         $validated = $request->validate([

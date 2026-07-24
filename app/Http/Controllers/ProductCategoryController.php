@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreProductCategoryRequest;
 use App\Http\Requests\UpdateProductCategoryRequest;
@@ -16,6 +17,7 @@ use Inertia\Response;
 
 class ProductCategoryController extends Controller
 {
+    use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
     public function index(Request $request): Response
@@ -55,11 +57,10 @@ class ProductCategoryController extends Controller
 
     public function store(StoreProductCategoryRequest $request): RedirectResponse
     {
-        $data = $request->validated();
+        $tenant = $this->requireTenantContext();
 
-        if (TenantContext::has()) {
-            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
-        }
+        $data = $request->validated();
+        $data['parent_account_id'] = $tenant->parentAccountId;
 
         $category = ProductCategory::query()->create($data);
 
@@ -91,6 +92,8 @@ class ProductCategoryController extends Controller
 
     public function update(UpdateProductCategoryRequest $request, ?Organization $organization, ProductCategory $category): RedirectResponse
     {
+        $this->requireTenantContext();
+
         $category->update($request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Category updated.')]);
@@ -100,6 +103,7 @@ class ProductCategoryController extends Controller
 
     public function destroy(?Organization $organization, ProductCategory $category): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('delete', $category);
 
         $category->delete();

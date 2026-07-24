@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreVendorRequest;
 use App\Http\Requests\UpdateVendorRequest;
@@ -18,6 +19,7 @@ use Inertia\Response;
 
 class VendorController extends Controller
 {
+    use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
     public function index(Request $request): Response
@@ -65,12 +67,11 @@ class VendorController extends Controller
 
     public function store(StoreVendorRequest $request): RedirectResponse
     {
+        $tenant = $this->requireTenantContext();
+
         $data = $request->validated();
         $data['is_active'] = $request->boolean('is_active', true);
-
-        if (TenantContext::has()) {
-            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
-        }
+        $data['parent_account_id'] = $tenant->parentAccountId;
 
         $vendor = Vendor::query()->create($data);
 
@@ -106,6 +107,8 @@ class VendorController extends Controller
 
     public function update(UpdateVendorRequest $request, ?Organization $organization, Vendor $vendor): RedirectResponse
     {
+        $this->requireTenantContext();
+
         $data = $request->validated();
         $data['is_active'] = $request->boolean('is_active', $vendor->is_active);
 
@@ -118,6 +121,7 @@ class VendorController extends Controller
 
     public function destroy(?Organization $organization, Vendor $vendor): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('delete', $vendor);
 
         $vendor->delete();

@@ -49,17 +49,24 @@ const props = withDefaults(defineProps<Props>(), {
 const page = usePage();
 const auth = computed(() => page.props.auth);
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
+const organizationSlug = computed(
+    () => page.props.tenant?.organization?.slug ?? null,
+);
 
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+const mainNavItems = computed((): NavItem[] => {
+    const slug = organizationSlug.value;
+
+    return [
+        {
+            title: 'Dashboard',
+            href: slug === null ? dashboard() : `/o/${slug}/dashboard`,
+            icon: LayoutGrid,
+        },
+    ];
+});
 
 const rightNavItems: NavItem[] = [
     {
@@ -146,7 +153,14 @@ const rightNavItems: NavItem[] = [
                     </Sheet>
                 </div>
 
-                <Link :href="dashboard()" class="flex items-center gap-x-2">
+                <Link
+                    :href="
+                        organizationSlug
+                            ? `/o/${organizationSlug}/dashboard`
+                            : dashboard()
+                    "
+                    class="flex items-center gap-x-2"
+                >
                     <AppLogo />
                 </Link>
 

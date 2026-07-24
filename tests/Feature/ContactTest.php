@@ -2,14 +2,23 @@
 
 use App\Models\Company;
 use App\Models\Contact;
-use App\Models\User;
+use App\Models\OrganizationCompany;
 
 test('salesmen can create contacts for their companies', function () {
-    $salesman = User::factory()->salesman()->create();
-    $company = Company::factory()->create(['owner_id' => $salesman->id]);
+    $ctx = createTenantUser('salesperson');
 
-    $this->actingAs($salesman)
-        ->post(route('contacts.store'), [
+    $company = Company::factory()->create([
+        'owner_id' => $ctx['user']->id,
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
+    OrganizationCompany::factory()->create([
+        'organization_id' => $ctx['organization']->id,
+        'company_id' => $company->id,
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
+
+    $this->actingAs($ctx['user'])
+        ->post(route('org.contacts.store', $ctx['organization']), [
             'company_id' => $company->id,
             'first_name' => 'Jane',
             'last_name' => 'Buyer',
@@ -24,19 +33,32 @@ test('salesmen can create contacts for their companies', function () {
         ->and($contact->is_primary)->toBeTrue()
         ->and($contact->company_id)->toBe($company->id);
 
-    $this->actingAs($salesman)
-        ->get(route('contacts.index'))
+    $this->actingAs($ctx['user'])
+        ->get(route('org.contacts.index', $ctx['organization']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page->component('contacts/Index'));
 });
 
 test('salesmen cannot create contacts for other companies', function () {
-    $owner = User::factory()->salesman()->create();
-    $other = User::factory()->salesman()->create();
-    $company = Company::factory()->create(['owner_id' => $owner->id]);
+    $ownerCtx = createTenantUser('salesperson');
+    $otherCtx = createTenantUser('salesperson');
 
-    $this->actingAs($other)
-        ->post(route('contacts.store'), [
+    $otherCtx['membership']->update([
+        'organization_id' => $ownerCtx['organization']->id,
+    ]);
+
+    $company = Company::factory()->create([
+        'owner_id' => $ownerCtx['user']->id,
+        'parent_account_id' => $ownerCtx['parent']->id,
+    ]);
+    OrganizationCompany::factory()->create([
+        'organization_id' => $ownerCtx['organization']->id,
+        'company_id' => $company->id,
+        'parent_account_id' => $ownerCtx['parent']->id,
+    ]);
+
+    $this->actingAs($otherCtx['user'])
+        ->post(route('org.contacts.store', $ownerCtx['organization']), [
             'company_id' => $company->id,
             'first_name' => 'Nope',
             'last_name' => 'Access',
@@ -45,12 +67,24 @@ test('salesmen cannot create contacts for other companies', function () {
 });
 
 test('marking a contact primary clears other primaries on the company', function () {
-    $salesman = User::factory()->salesman()->create();
-    $company = Company::factory()->create(['owner_id' => $salesman->id]);
-    $existing = Contact::factory()->primary()->create(['company_id' => $company->id]);
+    $ctx = createTenantUser('salesperson');
 
-    $this->actingAs($salesman)
-        ->post(route('contacts.store'), [
+    $company = Company::factory()->create([
+        'owner_id' => $ctx['user']->id,
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
+    OrganizationCompany::factory()->create([
+        'organization_id' => $ctx['organization']->id,
+        'company_id' => $company->id,
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
+    $existing = Contact::factory()->primary()->create([
+        'company_id' => $company->id,
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
+
+    $this->actingAs($ctx['user'])
+        ->post(route('org.contacts.store', $ctx['organization']), [
             'company_id' => $company->id,
             'first_name' => 'New',
             'last_name' => 'Primary',

@@ -1,13 +1,12 @@
 <?php
 
 use App\Models\ProductCategory;
-use App\Models\User;
 
 test('admins can create categories', function () {
-    $admin = User::factory()->admin()->create();
+    $ctx = createTenantUser('owner', 'parent_owner');
 
-    $this->actingAs($admin)
-        ->post(route('categories.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.categories.store', $ctx['organization']), [
             'name' => 'ACM Panels',
             'description' => 'Aluminum composite material',
         ])
@@ -20,10 +19,10 @@ test('admins can create categories', function () {
 });
 
 test('salesmen cannot manage categories', function () {
-    $salesman = User::factory()->salesman()->create();
+    $ctx = createTenantUser('salesperson');
 
-    $this->actingAs($salesman)
-        ->post(route('categories.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.categories.store', $ctx['organization']), [
             'name' => 'Blocked',
         ])
         ->assertForbidden();

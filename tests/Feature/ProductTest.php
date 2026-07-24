@@ -3,17 +3,20 @@
 use App\Enums\UnitOfMeasure;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\User;
 use App\Models\Vendor;
 use App\Support\Money;
 
 test('admins can create products with suggested sell from cost and markup', function () {
-    $admin = User::factory()->admin()->create();
-    $vendor = Vendor::factory()->create();
-    $category = ProductCategory::factory()->create();
+    $ctx = createTenantUser('owner', 'parent_owner');
+    $vendor = Vendor::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
+    $category = ProductCategory::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
 
-    $this->actingAs($admin)
-        ->post(route('products.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.products.store', $ctx['organization']), [
             'name' => '48x96 ACM Sign 3MM',
             'sku' => 'ACM-4896-3',
             'vendor_sku' => 'VEN-ACM-1',
@@ -36,11 +39,13 @@ test('admins can create products with suggested sell from cost and markup', func
 });
 
 test('related products can be linked', function () {
-    $admin = User::factory()->admin()->create();
-    $related = Product::factory()->create();
+    $ctx = createTenantUser('owner', 'parent_owner');
+    $related = Product::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
 
-    $this->actingAs($admin)
-        ->post(route('products.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.products.store', $ctx['organization']), [
             'name' => 'Vinyl Graphics Kit',
             'sku' => 'VINYL-KIT-1',
             'unit_of_measure' => UnitOfMeasure::Set->value,
@@ -57,22 +62,24 @@ test('related products can be linked', function () {
 });
 
 test('salesmen can view products but cannot create them', function () {
-    $salesman = User::factory()->salesman()->create();
-    $product = Product::factory()->create();
+    $ctx = createTenantUser('salesperson');
+    $product = Product::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
 
-    $this->actingAs($salesman)
-        ->get(route('products.index'))
+    $this->actingAs($ctx['user'])
+        ->get(route('org.products.index', $ctx['organization']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('products/Index')
             ->where('canViewCost', false));
 
-    $this->actingAs($salesman)
-        ->get(route('products.show', $product))
+    $this->actingAs($ctx['user'])
+        ->get(route('org.products.show', [$ctx['organization'], $product]))
         ->assertOk();
 
-    $this->actingAs($salesman)
-        ->post(route('products.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.products.store', $ctx['organization']), [
             'name' => 'Nope',
             'sku' => 'NOPE-1',
             'unit_of_measure' => UnitOfMeasure::Each->value,
@@ -83,11 +90,13 @@ test('salesmen can view products but cannot create them', function () {
 });
 
 test('salesmen cannot see product cost fields', function () {
-    $salesman = User::factory()->salesman()->create();
-    $product = Product::factory()->create();
+    $ctx = createTenantUser('salesperson');
+    $product = Product::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
 
-    $this->actingAs($salesman)
-        ->get(route('products.show', $product))
+    $this->actingAs($ctx['user'])
+        ->get(route('org.products.show', [$ctx['organization'], $product]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('products/Show')

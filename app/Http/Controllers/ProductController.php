@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UnitOfMeasure;
+use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
@@ -22,6 +23,7 @@ use Inertia\Response;
 
 class ProductController extends Controller
 {
+    use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
     public function index(Request $request): Response
@@ -70,7 +72,9 @@ class ProductController extends Controller
             'categories' => $categoriesQuery->get(['id', 'name']),
             'vendors' => $vendorsQuery->get(['id', 'name']),
             'canManage' => $user->can('create', Product::class),
-            'canViewCost' => $user->isAdmin(),
+            'canViewCost' => TenantContext::has()
+                ? TenantContext::get()->canViewCost()
+                : $user->isAdmin(),
         ]);
     }
 
@@ -101,15 +105,14 @@ class ProductController extends Controller
 
     public function store(StoreProductRequest $request): RedirectResponse
     {
+        $tenant = $this->requireTenantContext();
+
         $data = $request->validated();
         $relatedIds = $data['related_product_ids'] ?? [];
         unset($data['related_product_ids']);
 
         $data['is_active'] = $request->boolean('is_active', true);
-
-        if (TenantContext::has()) {
-            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
-        }
+        $data['parent_account_id'] = $tenant->parentAccountId;
 
         $product = DB::transaction(function () use ($data, $relatedIds): Product {
             $product = Product::query()->create($data);
@@ -176,6 +179,8 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, ?Organization $organization, Product $product): RedirectResponse
     {
+        $this->requireTenantContext();
+
         $data = $request->validated();
         $relatedIds = $data['related_product_ids'] ?? [];
         unset($data['related_product_ids']);
@@ -194,6 +199,7 @@ class ProductController extends Controller
 
     public function destroy(?Organization $organization, Product $product): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('delete', $product);
 
         $product->delete();

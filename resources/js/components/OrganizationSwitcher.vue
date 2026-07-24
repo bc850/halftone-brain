@@ -27,12 +27,45 @@ const currentLabel = computed(() => {
     return tenant.value?.organization?.name ?? 'Select organization';
 });
 
+const MODULES = new Set([
+    'dashboard',
+    'companies',
+    'contacts',
+    'deals',
+    'products',
+    'vendors',
+    'categories',
+]);
+
+function destinationForOrganization(organization: OrganizationSummary): string {
+    const path = page.url.split('?')[0] ?? '';
+    const parts = path.split('/').filter(Boolean);
+
+    // /o/{slug}/module[/id[/action]]
+    if (parts[0] === 'o' && parts.length >= 3 && MODULES.has(parts[2])) {
+        const moduleName = parts[2];
+
+        if (moduleName === 'dashboard' || parts.length === 3) {
+            return `/o/${organization.slug}/${parts.slice(2).join('/')}`;
+        }
+
+        // Show/edit/create deeper paths → module index (safe cross-org fallback)
+        if (parts.length === 4 && parts[3] === 'create') {
+            return `/o/${organization.slug}/${moduleName}/create`;
+        }
+
+        return `/o/${organization.slug}/${moduleName}`;
+    }
+
+    return orgDashboard.url(organization.slug);
+}
+
 const switchOrganization = (organization: OrganizationSummary): void => {
     if (tenant.value?.organization?.slug === organization.slug) {
         return;
     }
 
-    router.visit(orgDashboard.url(organization.slug));
+    router.visit(destinationForOrganization(organization));
 };
 </script>
 

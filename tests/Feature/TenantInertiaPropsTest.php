@@ -17,7 +17,7 @@ test('guests receive an empty tenant payload', function () {
             ->where('tenant.organizations', []));
 });
 
-test('authenticated legacy pages expose accessible organizations without active tenant context', function () {
+test('authenticated legacy dashboard redirects into organization context', function () {
     $user = User::factory()->create();
     $organization = Organization::factory()->create();
 
@@ -29,14 +29,7 @@ test('authenticated legacy pages expose accessible organizations without active 
 
     $this->actingAs($user)
         ->get(route('dashboard'))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('tenant.organization', null)
-            ->where('tenant.permissions', [])
-            ->where('tenant.parentPermissions', [])
-            ->where('tenant.canManageParent', false)
-            ->has('tenant.organizations', 1)
-            ->where('tenant.organizations.0.slug', $organization->slug));
+        ->assertRedirect(route('org.dashboard', $organization));
 });
 
 test('organization routes expose tenant context and accessible organizations', function () {

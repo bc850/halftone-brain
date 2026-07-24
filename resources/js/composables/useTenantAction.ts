@@ -102,3 +102,44 @@ export function useTenantRoute<T extends RouteHelper>(
 
     return wrapOrgRoute(org, slug) as T;
 }
+
+const LEGACY_MODULE_PREFIXES = [
+    '/dashboard',
+    '/companies',
+    '/contacts',
+    '/deals',
+    '/products',
+    '/vendors',
+    '/categories',
+] as const;
+
+/**
+ * Rewrite a legacy CRM/catalog path into the current organization URL when
+ * TenantContext props are present. Used by breadcrumbs and shared nav.
+ */
+export function tenantAwareHref(href: string, slug?: string | null): string {
+    const organization = slug ?? organizationSlug();
+
+    if (!organization) {
+        return href;
+    }
+
+    if (
+        href.startsWith(`/o/${organization}/`) ||
+        href === `/o/${organization}`
+    ) {
+        return href;
+    }
+
+    for (const prefix of LEGACY_MODULE_PREFIXES) {
+        if (
+            href === prefix ||
+            href.startsWith(`${prefix}/`) ||
+            href.startsWith(`${prefix}?`)
+        ) {
+            return `/o/${organization}${href}`;
+        }
+    }
+
+    return href;
+}

@@ -186,13 +186,7 @@ test('organization request followed by legacy request does not expose tenant con
 
     $this->actingAs($fixture['user'])
         ->get(route('dashboard'))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('tenant.organization', null)
-            ->where('tenant.permissions', [])
-            ->where('tenant.parentPermissions', [])
-            ->where('tenant.canManageParent', false)
-            ->has('tenant.organizations', 1));
+        ->assertRedirect(route('org.dashboard', $fixture['organization']));
 
     expect(TenantContext::has())->toBeFalse()
         ->and(TenantContext::getOptional())->toBeNull();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreContactRequest;
 use App\Http\Requests\UpdateContactRequest;
@@ -19,6 +20,7 @@ use Inertia\Response;
 
 class ContactController extends Controller
 {
+    use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
     public function index(Request $request): Response
@@ -81,14 +83,12 @@ class ContactController extends Controller
 
     public function store(StoreContactRequest $request): RedirectResponse
     {
+        $tenant = $this->requireTenantContext();
         $this->authorize('view', $request->company());
 
         $data = $request->validated();
         $data['is_primary'] = $request->boolean('is_primary');
-
-        if (TenantContext::has()) {
-            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
-        }
+        $data['parent_account_id'] = $tenant->parentAccountId;
 
         $contact = DB::transaction(function () use ($data): Contact {
             if ($data['is_primary'] === true) {
@@ -139,6 +139,8 @@ class ContactController extends Controller
 
     public function update(UpdateContactRequest $request, ?Organization $organization, Contact $contact): RedirectResponse
     {
+        $this->requireTenantContext();
+
         $data = $request->validated();
         $data['is_primary'] = $request->boolean('is_primary');
 
@@ -160,6 +162,7 @@ class ContactController extends Controller
 
     public function destroy(?Organization $organization, Contact $contact): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('delete', $contact);
 
         $contact->delete();

@@ -7,26 +7,34 @@ use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VisibilityPreferenceController;
+use App\Http\Middleware\EnforceLegacyTenantBoundary;
 use App\Http\Middleware\ResolveTenantContextFromRoute;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
-
     Route::patch('preferences/visibility', [VisibilityPreferenceController::class, 'update'])
         ->name('preferences.visibility');
 
-    Route::resource('companies', CompanyController::class);
-    Route::resource('contacts', ContactController::class);
-    Route::resource('deals', DealController::class);
-    Route::patch('deals/{deal}/stage', [DealController::class, 'updateStage'])->name('deals.stage');
+    /*
+     | Legacy CRM/catalog routes remain registered for compatibility.
+     | GET navigations redirect into /o/{organization}/…;
+     | mutations fail closed with 409 before controllers run.
+     */
+    Route::middleware([EnforceLegacyTenantBoundary::class])->group(function () {
+        Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 
-    Route::resource('vendors', VendorController::class);
-    Route::resource('categories', ProductCategoryController::class)
-        ->parameters(['categories' => 'category']);
-    Route::resource('products', ProductController::class);
+        Route::resource('companies', CompanyController::class);
+        Route::resource('contacts', ContactController::class);
+        Route::resource('deals', DealController::class);
+        Route::patch('deals/{deal}/stage', [DealController::class, 'updateStage'])->name('deals.stage');
+
+        Route::resource('vendors', VendorController::class);
+        Route::resource('categories', ProductCategoryController::class)
+            ->parameters(['categories' => 'category']);
+        Route::resource('products', ProductController::class);
+    });
 });
 
 Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])

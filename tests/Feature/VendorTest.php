@@ -1,13 +1,12 @@
 <?php
 
-use App\Models\User;
 use App\Models\Vendor;
 
 test('admins can create vendors', function () {
-    $admin = User::factory()->admin()->create();
+    $ctx = createTenantUser('owner', 'parent_owner');
 
-    $this->actingAs($admin)
-        ->post(route('vendors.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.vendors.store', $ctx['organization']), [
             'name' => 'Avery Dennison',
             'account_number' => 'AD-100',
             'email' => 'orders@example.com',
@@ -19,29 +18,32 @@ test('admins can create vendors', function () {
 });
 
 test('salesmen cannot create vendors but can view them', function () {
-    $salesman = User::factory()->salesman()->create();
-    $vendor = Vendor::factory()->create();
+    $ctx = createTenantUser('salesperson');
+    $vendor = Vendor::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+    ]);
 
-    $this->actingAs($salesman)
-        ->post(route('vendors.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.vendors.store', $ctx['organization']), [
             'name' => 'Blocked Vendor',
         ])
         ->assertForbidden();
 
-    $this->actingAs($salesman)
-        ->get(route('vendors.show', $vendor))
+    $this->actingAs($ctx['user'])
+        ->get(route('org.vendors.show', [$ctx['organization'], $vendor]))
         ->assertOk();
 });
 
 test('salesmen can list vendors without account details', function () {
-    $salesman = User::factory()->salesman()->create();
+    $ctx = createTenantUser('salesperson');
     Vendor::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
         'account_number' => 'SECRET-99',
         'email' => 'orders@vendor.test',
     ]);
 
-    $this->actingAs($salesman)
-        ->get(route('vendors.index'))
+    $this->actingAs($ctx['user'])
+        ->get(route('org.vendors.index', $ctx['organization']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('vendors/Index')

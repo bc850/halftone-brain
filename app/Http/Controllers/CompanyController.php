@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\SalesTaxStatus;
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreCompanyRequest;
 use App\Http\Requests\UpdateCompanyRequest;
@@ -21,6 +22,7 @@ use Inertia\Response;
 
 class CompanyController extends Controller
 {
+    use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
     public function index(Request $request): Response
@@ -81,30 +83,26 @@ class CompanyController extends Controller
 
     public function store(StoreCompanyRequest $request): RedirectResponse
     {
+        $tenant = $this->requireTenantContext();
+
         /** @var User $user */
         $user = $request->user();
         $data = $request->validated();
         $data['owner_id'] = $user->isAdmin() && isset($data['owner_id'])
             ? $data['owner_id']
             : $user->id;
-
-        if (TenantContext::has()) {
-            $data['parent_account_id'] = TenantContext::get()->parentAccountId;
-        }
+        $data['parent_account_id'] = $tenant->parentAccountId;
 
         $company = Company::query()->create($data);
 
-        if (TenantContext::has()) {
-            $tenant = TenantContext::get();
-            OrganizationCompany::query()->create([
-                'organization_id' => $tenant->organizationId,
-                'company_id' => $company->id,
-                'parent_account_id' => $tenant->parentAccountId,
-                'lifecycle_status' => 'prospect',
-                'relationship_status' => 'new',
-                'tax_posture' => 'unknown',
-            ]);
-        }
+        OrganizationCompany::query()->create([
+            'organization_id' => $tenant->organizationId,
+            'company_id' => $company->id,
+            'parent_account_id' => $tenant->parentAccountId,
+            'lifecycle_status' => 'prospect',
+            'relationship_status' => 'new',
+            'tax_posture' => 'unknown',
+        ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Company created.')]);
 
@@ -156,6 +154,8 @@ class CompanyController extends Controller
 
     public function update(UpdateCompanyRequest $request, ?Organization $organization, Company $company): RedirectResponse
     {
+        $this->requireTenantContext();
+
         $company->update($request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Company updated.')]);
@@ -165,6 +165,7 @@ class CompanyController extends Controller
 
     public function destroy(?Organization $organization, Company $company): RedirectResponse
     {
+        $this->requireTenantContext();
         $this->authorize('delete', $company);
 
         $company->delete();

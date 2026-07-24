@@ -1,18 +1,21 @@
 <?php
 
+use App\Enums\PermissionEffect;
 use App\Enums\SalesTaxStatus;
+use App\Enums\UserRole;
 use App\Models\Company;
+use App\Models\OrganizationCompany;
 use App\Models\User;
 
 test('guests cannot view companies', function () {
     $this->get(route('companies.index'))->assertRedirect(route('login'));
 });
 
-test('salesmen can create and view their companies', function () {
-    $salesman = User::factory()->salesman()->create();
+test('owners can create and view their companies under organization routes', function () {
+    $ctx = createTenantUser('owner', 'parent_owner');
 
-    $this->actingAs($salesman)
-        ->post(route('companies.store'), [
+    $this->actingAs($ctx['user'])
+        ->post(route('org.companies.store', $ctx['organization']), [
             'name' => 'Acme Signs',
             'sales_tax_status' => SalesTaxStatus::Taxable->value,
             'email' => 'billing@acme.test',
@@ -23,38 +26,61 @@ test('salesmen can create and view their companies', function () {
     $company = Company::query()->where('name', 'Acme Signs')->first();
 
     expect($company)->not->toBeNull()
-        ->and($company->owner_id)->toBe($salesman->id);
+        ->and($company->owner_id)->toBe($ctx['user']->id)
+        ->and((int) $company->parent_account_id)->toBe($ctx['parent']->id);
 
-    $this->actingAs($salesman)
-        ->get(route('companies.index'))
+    expect(OrganizationCompany::query()
+        ->where('company_id', $company->id)
+        ->where('organization_id', $ctx['organization']->id)
+        ->exists())->toBeTrue();
+
+    $this->actingAs($ctx['user'])
+        ->get(route('org.companies.index', $ctx['organization']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('companies/Index')
             ->has('companies.data', 1));
 });
 
-test('salesmen cannot view another salesmans companies unless toggled', function () {
-    $owner = User::factory()->salesman()->create();
-    $other = User::factory()->salesman()->create();
-    $company = Company::factory()->create(['owner_id' => $owner->id]);
+test('salespeople cannot view another owners company without view_all', function () {
+    $ownerCtx = createTenantUser('owner', 'parent_owner');
+    $otherCtx = createTenantUser('salesperson');
 
-    $this->actingAs($other)
-        ->get(route('companies.show', $company))
+    // Put the salesperson into the owner's organization.
+    $otherCtx['membership']->update([
+        'organization_id' => $ownerCtx['organization']->id,
+    ]);
+
+    $company = Company::factory()->create([
+        'owner_id' => $ownerCtx['user']->id,
+        'parent_account_id' => $ownerCtx['parent']->id,
+    ]);
+    OrganizationCompany::factory()->create([
+        'organization_id' => $ownerCtx['organization']->id,
+        'company_id' => $company->id,
+        'parent_account_id' => $ownerCtx['parent']->id,
+    ]);
+
+    $this->actingAs($otherCtx['user'])
+        ->get(route('org.companies.show', [$ownerCtx['organization'], $company]))
         ->assertForbidden();
 
-    $other->update(['see_everyone' => true]);
+    attachOrgOverride($otherCtx['membership']->fresh(), 'crm.company.view_all', PermissionEffect::Allow);
 
-    $this->actingAs($other)
-        ->get(route('companies.show', $company))
+    $this->actingAs($otherCtx['user'])
+        ->get(route('org.companies.show', [$ownerCtx['organization'], $company]))
         ->assertOk();
 });
 
-test('admins can assign company owners', function () {
-    $admin = User::factory()->admin()->create();
+test('parent owners can assign company owners through organization routes', function () {
+    $ctx = createTenantUser('owner', 'parent_owner');
     $salesman = User::factory()->salesman()->create();
 
-    $this->actingAs($admin)
-        ->post(route('companies.store'), [
+    // Legacy owner_id assignment still requires isAdmin() in controller.
+    $ctx['user']->forceFill(['role' => UserRole::Admin])->save();
+
+    $this->actingAs($ctx['user']->fresh())
+        ->post(route('org.companies.store', $ctx['organization']), [
             'name' => 'Owned By Sales',
             'owner_id' => $salesman->id,
             'sales_tax_status' => SalesTaxStatus::Exempt->value,
@@ -66,11 +92,12 @@ test('admins can assign company owners', function () {
 });
 
 test('admins cannot assign project managers as company owners', function () {
-    $admin = User::factory()->admin()->create();
+    $ctx = createTenantUser('owner', 'parent_owner');
+    $ctx['user']->forceFill(['role' => UserRole::Admin])->save();
     $projectManager = User::factory()->projectManager()->create();
 
-    $this->actingAs($admin)
-        ->post(route('companies.store'), [
+    $this->actingAs($ctx['user']->fresh())
+        ->post(route('org.companies.store', $ctx['organization']), [
             'name' => 'Bad Owner Co',
             'owner_id' => $projectManager->id,
             'sales_tax_status' => SalesTaxStatus::Taxable->value,
