@@ -4,6 +4,7 @@ namespace App\Support\Tenancy;
 
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use stdClass;
 
 /**
  * Pre-hardening integrity checks for Phase 0E.
@@ -16,6 +17,10 @@ class TenantSchemaHardeningGuard
      */
     public static function violations(): array
     {
+        if (DB::connection()->pretending()) {
+            return [];
+        }
+
         $violations = [];
 
         $nullChecks = [
@@ -32,7 +37,7 @@ class TenantSchemaHardeningGuard
         ];
 
         foreach ($nullChecks as $label => $sql) {
-            if ((int) DB::selectOne($sql)->c > 0) {
+            if (self::countOrFail($sql, $label) > 0) {
                 $violations[] = "null_tenant:{$label}";
             }
         }
@@ -94,7 +99,7 @@ class TenantSchemaHardeningGuard
         ];
 
         foreach ($mismatchChecks as $label => $sql) {
-            if ((int) DB::selectOne($sql)->c > 0) {
+            if (self::countOrFail($sql, $label) > 0) {
                 $violations[] = "mismatch:{$label}";
             }
         }
@@ -117,7 +122,7 @@ class TenantSchemaHardeningGuard
         ];
 
         foreach ($orphanChecks as $label => $sql) {
-            if ((int) DB::selectOne($sql)->c > 0) {
+            if (self::countOrFail($sql, $label) > 0) {
                 $violations[] = "orphan:{$label}";
             }
         }
@@ -127,6 +132,10 @@ class TenantSchemaHardeningGuard
 
     public static function assertReadyOrFail(): void
     {
+        if (DB::connection()->pretending()) {
+            return;
+        }
+
         $violations = self::violations();
 
         if ($violations === []) {
@@ -136,5 +145,18 @@ class TenantSchemaHardeningGuard
         throw new RuntimeException(
             'Tenant schema hardening aborted; integrity violations: '.implode(', ', $violations)
         );
+    }
+
+    private static function countOrFail(string $sql, string $label): int
+    {
+        $row = DB::selectOne($sql);
+
+        if (! $row instanceof stdClass || ! property_exists($row, 'c') || $row->c === null) {
+            throw new RuntimeException(
+                "Tenant schema hardening aborted; validation query returned no result for [{$label}]."
+            );
+        }
+
+        return (int) $row->c;
     }
 }
