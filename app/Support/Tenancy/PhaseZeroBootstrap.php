@@ -15,10 +15,10 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\Audit\Auditor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
-use Throwable;
 
 final class PhaseZeroBootstrap
 {
@@ -611,13 +611,14 @@ final class PhaseZeroBootstrap
             'product_categories',
             'deals',
             'teams',
+            // Checked only while present; skipped after the 0F drop migration.
             'team_user',
             'organization_companies',
             'team_memberships',
         ];
 
         foreach ($tables as $table) {
-            if (! $this->tableExists($table)) {
+            if (! Schema::hasTable($table)) {
                 continue;
             }
 
@@ -628,17 +629,6 @@ final class PhaseZeroBootstrap
                     "Unexpected business data found in [{$table}] ({$count} rows). Refusing bootstrap; no automatic backfill.",
                 );
             }
-        }
-    }
-
-    private function tableExists(string $table): bool
-    {
-        try {
-            DB::table($table)->limit(1)->get();
-
-            return true;
-        } catch (Throwable) {
-            return false;
         }
     }
 
@@ -685,7 +675,7 @@ final class PhaseZeroBootstrap
         $counts = [];
 
         foreach ($tables as $table) {
-            $counts[$table] = $this->tableExists($table) ? DB::table($table)->count() : 0;
+            $counts[$table] = Schema::hasTable($table) ? DB::table($table)->count() : 0;
         }
 
         return $counts;

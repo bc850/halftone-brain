@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['name', 'organization_id', 'parent_account_id'])]
@@ -33,14 +32,8 @@ class Team extends Model
     }
 
     /**
-     * @return BelongsToMany<User, $this>
-     */
-    public function users(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class)->withTimestamps();
-    }
-
-    /**
+     * Tenant-aware memberships: Team → TeamMembership → Membership → User.
+     *
      * @return HasMany<TeamMembership, $this>
      */
     public function teamMemberships(): HasMany

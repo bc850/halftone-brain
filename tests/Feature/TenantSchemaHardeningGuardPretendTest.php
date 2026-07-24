@@ -99,7 +99,7 @@ function phase0e3AssertSoftSchema(): void
 
 function phase0e3RollbackHardening(): void
 {
-    Artisan::call('migrate:rollback', ['--step' => 3, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 4, '--force' => true]);
     phase0e3AssertSoftSchema();
 }
 

@@ -39,7 +39,9 @@ test('phase 0a tenant ownership columns exist on legacy tables', function () {
             'owner_id',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('teams', ['organization_id', 'parent_account_id', 'name']))->toBeTrue()
-        ->and(Schema::hasTable('team_user'))->toBeTrue()
+        // 0A created team_user; Phase 0F drop migration removes it from the fully migrated schema.
+        ->and(Schema::hasTable('team_user'))->toBeFalse()
+        ->and(Schema::hasTable('team_memberships'))->toBeTrue()
         ->and(Schema::hasColumns('users', ['role', 'see_everyone']))->toBeTrue();
 });
 
