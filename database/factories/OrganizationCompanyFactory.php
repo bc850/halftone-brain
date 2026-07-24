@@ -19,29 +19,19 @@ class OrganizationCompanyFactory extends Factory
     {
         return [
             'organization_id' => Organization::factory(),
-            'company_id' => Company::factory(),
+            'parent_account_id' => fn (array $attributes): int => (int) Organization::query()
+                ->whereKey($attributes['organization_id'])
+                ->value('parent_account_id'),
+            'company_id' => function (array $attributes): int {
+                return (int) Company::factory()->create([
+                    'parent_account_id' => $attributes['parent_account_id'],
+                ])->id;
+            },
             'lifecycle_status' => 'prospect',
             'relationship_status' => 'new',
             'tax_posture' => 'unknown',
             'is_flagged' => false,
             'credit_hold' => false,
         ];
-    }
-
-    public function configure(): static
-    {
-        return $this->afterMaking(function (OrganizationCompany $organizationCompany): void {
-            if (isset($organizationCompany->attributes['parent_account_id'])) {
-                return;
-            }
-
-            $organization = $organizationCompany->organization()
-                ->getResults()
-                ?? Organization::query()->find($organizationCompany->organization_id);
-
-            if ($organization instanceof Organization) {
-                $organizationCompany->parent_account_id = $organization->parent_account_id;
-            }
-        });
     }
 }

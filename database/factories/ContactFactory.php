@@ -18,6 +18,9 @@ class ContactFactory extends Factory
     {
         return [
             'company_id' => Company::factory(),
+            'parent_account_id' => fn (array $attributes): int => (int) Company::query()
+                ->whereKey($attributes['company_id'])
+                ->value('parent_account_id'),
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
             'email' => fake()->optional()->safeEmail(),

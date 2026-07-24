@@ -259,11 +259,14 @@ test('unexpected business data causes the command to refuse execution', function
         'email_verified_at' => now(),
     ]);
 
-    Company::factory()->create();
+    $parent = ParentAccount::factory()->create();
+    Company::factory()->create([
+        'parent_account_id' => $parent->id,
+    ]);
 
     runBootstrap(execute: true)->assertFailed();
 
-    expect(ParentAccount::query()->count())->toBe(0)
+    expect(ParentAccount::query()->count())->toBe(1)
         ->and(Role::query()->count())->toBe(0);
 });
 

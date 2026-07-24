@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\SalesTaxStatus;
 use App\Models\Company;
+use App\Models\ParentAccount;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,6 +19,7 @@ class CompanyFactory extends Factory
     public function definition(): array
     {
         return [
+            'parent_account_id' => ParentAccount::factory(),
             'name' => fake()->company(),
             'owner_id' => User::factory(),
             'phone' => fake()->optional()->phoneNumber(),

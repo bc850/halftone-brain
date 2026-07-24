@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Organization;
 use App\Models\Team;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -16,6 +17,10 @@ class TeamFactory extends Factory
     public function definition(): array
     {
         return [
+            'organization_id' => Organization::factory(),
+            'parent_account_id' => fn (array $attributes): int => (int) Organization::query()
+                ->whereKey($attributes['organization_id'])
+                ->value('parent_account_id'),
             'name' => fake()->unique()->company().' Team',
         ];
     }

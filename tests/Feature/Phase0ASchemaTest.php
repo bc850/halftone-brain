@@ -25,7 +25,7 @@ test('phase 0a tenancy and rbac tables exist', function () {
         ->and(Schema::hasTable('number_sequences'))->toBeTrue();
 });
 
-test('phase 0a nullable tenant columns exist on legacy tables', function () {
+test('phase 0a tenant ownership columns exist on legacy tables', function () {
     expect(Schema::hasColumns('companies', ['parent_account_id', 'owner_id', 'sales_tax_status']))->toBeTrue()
         ->and(Schema::hasColumns('contacts', ['parent_account_id', 'company_id']))->toBeTrue()
         ->and(Schema::hasColumns('vendors', ['parent_account_id']))->toBeTrue()
@@ -80,15 +80,13 @@ test('phase 0a key columns exist on rbac and audit tables', function () {
 test('legacy crm factories still persist after phase 0a schema', function () {
     $user = User::factory()->create();
     $company = Company::factory()->create(['owner_id' => $user->id]);
-    $deal = Deal::factory()->create([
-        'company_id' => $company->id,
-        'owner_id' => $user->id,
-    ]);
+    $deal = Deal::factory()->create(['owner_id' => $user->id]);
 
-    expect($company->fresh()->parent_account_id)->toBeNull()
-        ->and($deal->fresh()->organization_id)->toBeNull()
-        ->and($deal->fresh()->organization_company_id)->toBeNull()
-        ->and($deal->fresh()->company_id)->toBe($company->id);
+    expect($company->fresh()->parent_account_id)->not->toBeNull()
+        ->and($deal->fresh()->organization_id)->not->toBeNull()
+        ->and($deal->fresh()->organization_company_id)->not->toBeNull()
+        ->and($deal->fresh()->parent_account_id)->not->toBeNull()
+        ->and($deal->fresh()->company_id)->not->toBeNull();
 });
 
 test('roles key and permissions key are globally unique', function () {
@@ -373,13 +371,18 @@ function seedTwoOrganizationsWithUsers(): array
         'updated_at' => now(),
     ]);
 
-    $companyId = (int) Company::factory()->create(['owner_id' => $userA->id])->id;
-    $companyBId = (int) Company::factory()->create(['owner_id' => $userA->id])->id;
-    $companyCId = (int) Company::factory()->create(['owner_id' => $userA->id])->id;
-
-    DB::table('companies')->whereIn('id', [$companyId, $companyBId, $companyCId])->update([
+    $companyId = (int) Company::factory()->create([
+        'owner_id' => $userA->id,
         'parent_account_id' => $parentId,
-    ]);
+    ])->id;
+    $companyBId = (int) Company::factory()->create([
+        'owner_id' => $userA->id,
+        'parent_account_id' => $parentId,
+    ])->id;
+    $companyCId = (int) Company::factory()->create([
+        'owner_id' => $userA->id,
+        'parent_account_id' => $parentId,
+    ])->id;
 
     return [
         'parent_id' => $parentId,

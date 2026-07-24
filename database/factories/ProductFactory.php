@@ -3,9 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\UnitOfMeasure;
+use App\Models\ParentAccount;
 use App\Models\Product;
-use App\Models\ProductCategory;
-use App\Models\Vendor;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -24,11 +23,13 @@ class ProductFactory extends Factory
         $listPriceCents = Money::suggestedListPriceCents($trueCostMicroUnits, $markupBasisPoints);
 
         return [
+            'parent_account_id' => ParentAccount::factory(),
             'name' => fake()->sentence(3).' Sign',
             'sku' => strtoupper(fake()->unique()->bothify('SKU-####??')),
             'vendor_sku' => fake()->optional()->bothify('VEN-####'),
-            'vendor_id' => Vendor::factory(),
-            'product_category_id' => ProductCategory::factory(),
+            // Optional relationships remain nullable; set explicitly when needed so parent matches.
+            'vendor_id' => null,
+            'product_category_id' => null,
             'unit_of_measure' => fake()->randomElement(UnitOfMeasure::cases()),
             'true_cost_micro_units' => $trueCostMicroUnits,
             'markup_basis_points' => $markupBasisPoints,

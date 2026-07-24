@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\ParentAccount;
 use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -16,6 +17,7 @@ class VendorFactory extends Factory
     public function definition(): array
     {
         return [
+            'parent_account_id' => ParentAccount::factory(),
             'name' => fake()->company(),
             'account_number' => fake()->optional()->bothify('V-####'),
             'phone' => fake()->optional()->phoneNumber(),
