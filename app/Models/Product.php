@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
 use Carbon\Carbon;
 use Database\Factories\ProductFactory;
@@ -11,10 +12,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
+ * @property int $parent_account_id
  * @property string $name
+ * @property ProductFamily $product_family
  * @property string $sku
  * @property string|null $vendor_sku
  * @property int|null $vendor_id
@@ -32,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 #[Fillable([
     'parent_account_id',
     'name',
+    'product_family',
     'sku',
     'vendor_sku',
     'vendor_id',
@@ -55,12 +60,21 @@ class Product extends Model
     protected function casts(): array
     {
         return [
+            'product_family' => ProductFamily::class,
             'unit_of_measure' => UnitOfMeasure::class,
             'true_cost_micro_units' => 'integer',
             'markup_basis_points' => 'integer',
             'list_price_cents' => 'integer',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * @return BelongsTo<ParentAccount, $this>
+     */
+    public function parentAccount(): BelongsTo
+    {
+        return $this->belongsTo(ParentAccount::class);
     }
 
     /**
@@ -77,6 +91,14 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ProductCategory::class, 'product_category_id');
+    }
+
+    /**
+     * @return HasMany<OrganizationProduct, $this>
+     */
+    public function organizationProducts(): HasMany
+    {
+        return $this->hasMany(OrganizationProduct::class);
     }
 
     /**

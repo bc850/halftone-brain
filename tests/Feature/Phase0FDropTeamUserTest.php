@@ -63,6 +63,12 @@ function phase0fHasUniqueTeamUserPivot(): bool
     return false;
 }
 
+function phase0fRollbackDropMigration(): void
+{
+    // Roll back Phase 1A (2) then the 0F team_user drop.
+    Artisan::call('migrate:rollback', ['--step' => 3, '--force' => true]);
+}
+
 function phase0fSeedTeamAndUser(): array
 {
     $parent = ParentAccount::factory()->create();
@@ -86,7 +92,7 @@ test('fully migrated schema drops team_user and retains team_memberships plus le
 });
 
 test('migrate pretend for pending team_user drop succeeds without schema change', function () {
-    Artisan::call('migrate:rollback', ['--step' => 1, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 3, '--force' => true]);
 
     expect(Schema::hasTable('team_user'))->toBeTrue()
         ->and(DB::table('migrations')->where('migration', PHASE_0F_DROP_TEAM_USER)->exists())->toBeFalse();
@@ -109,7 +115,7 @@ test('migrate pretend for pending team_user drop succeeds without schema change'
 test('empty team_user drops successfully and remigration drops again after rollback', function () {
     expect(Schema::hasTable('team_user'))->toBeFalse();
 
-    Artisan::call('migrate:rollback', ['--step' => 1, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 3, '--force' => true]);
     expect(Schema::hasTable('team_user'))->toBeTrue()
         ->and(phase0fHasUniqueTeamUserPivot())->toBeTrue();
 
@@ -148,7 +154,7 @@ test('empty team_user drops successfully and remigration drops again after rollb
 });
 
 test('nonempty team_user blocks migration and leaves rows intact', function () {
-    Artisan::call('migrate:rollback', ['--step' => 1, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 3, '--force' => true]);
     expect(Schema::hasTable('team_user'))->toBeTrue();
 
     $seed = phase0fSeedTeamAndUser();

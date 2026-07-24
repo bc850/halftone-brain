@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
 use App\Models\ParentAccount;
 use App\Models\Product;
@@ -25,6 +26,7 @@ class ProductFactory extends Factory
         return [
             'parent_account_id' => ParentAccount::factory(),
             'name' => fake()->sentence(3).' Sign',
+            'product_family' => ProductFamily::Other,
             'sku' => strtoupper(fake()->unique()->bothify('SKU-####??')),
             'vendor_sku' => fake()->optional()->bothify('VEN-####'),
             // Optional relationships remain nullable; set explicitly when needed so parent matches.
