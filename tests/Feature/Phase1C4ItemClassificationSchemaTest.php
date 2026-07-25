@@ -298,6 +298,7 @@ test('phase 1c4 existing catalog creation and pricing still work', function () {
             'name' => '48x96 ACM Sign',
             'sku' => 'ACM-SIGN-1C4',
             'product_family' => ProductFamily::Signage->value,
+            'item_kind' => 'product',
             'unit_of_measure' => UnitOfMeasure::Each->value,
             'is_active' => true,
             'is_available' => true,

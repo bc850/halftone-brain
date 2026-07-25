@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ItemKind;
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
 use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
 use App\Http\Requests\Concerns\NormalizesOrganizationProductPricing;
+use App\Http\Requests\Concerns\ValidatesOrganizationProductClassification;
 use App\Models\OrganizationProduct;
+use App\Support\Catalog\ItemClassificationDefaults;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -16,10 +19,43 @@ use Illuminate\Validation\Rule;
 class StoreOrganizationProductRequest extends FormRequest
 {
     use NormalizesOrganizationProductPricing;
+    use ValidatesOrganizationProductClassification;
 
     public function authorize(): bool
     {
         return $this->user()?->can('create', OrganizationProduct::class) ?? false;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (! $this->filled('item_kind')) {
+            return;
+        }
+
+        $itemKind = ItemKind::tryFrom((string) $this->input('item_kind'));
+
+        if ($itemKind === null) {
+            return;
+        }
+
+        $defaults = ItemClassificationDefaults::for($itemKind);
+        $merge = [];
+
+        if (! $this->exists('is_sellable')) {
+            $merge['is_sellable'] = $defaults['is_sellable'];
+        }
+
+        if (! $this->exists('is_purchasable')) {
+            $merge['is_purchasable'] = $defaults['is_purchasable'];
+        }
+
+        if (! $this->filled('inventory_tracking_mode')) {
+            $merge['inventory_tracking_mode'] = $defaults['inventory_tracking_mode'];
+        }
+
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
     }
 
     /**
@@ -28,6 +64,7 @@ class StoreOrganizationProductRequest extends FormRequest
     public function rules(): array
     {
         $parentId = TenantContext::get()->parentAccountId;
+        $sellable = $this->boolean('is_sellable');
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -38,6 +75,7 @@ class StoreOrganizationProductRequest extends FormRequest
                 Rule::unique('products', 'sku')->where(fn ($query) => $query->where('parent_account_id', $parentId)),
             ],
             'product_family' => ['required', Rule::enum(ProductFamily::class)],
+            'item_kind' => ['required', Rule::enum(ItemKind::class)],
             'vendor_sku' => ['nullable', 'string', 'max:100'],
             'vendor_id' => [
                 'nullable',
@@ -57,12 +95,13 @@ class StoreOrganizationProductRequest extends FormRequest
             'is_available' => ['sometimes', 'boolean'],
             'lead_time_days' => ['nullable', 'integer', 'min:0'],
             'organization_notes' => ['nullable', 'string'],
-            'material_cost' => ['required', 'regex:/^\d+(\.\d{1,4})?$/'],
-            'labor_cost' => ['required', 'regex:/^\d+(\.\d{1,4})?$/'],
-            'overhead_mode' => ['required', Rule::enum(OverheadMode::class)],
+            ...$this->classificationFieldRules(),
+            'material_cost' => [$sellable ? 'required' : 'nullable', 'regex:/^\d+(\.\d{1,4})?$/'],
+            'labor_cost' => [$sellable ? 'required' : 'nullable', 'regex:/^\d+(\.\d{1,4})?$/'],
+            'overhead_mode' => [$sellable ? 'required' : 'nullable', Rule::enum(OverheadMode::class)],
             'overhead_amount' => ['nullable', 'regex:/^\d+(\.\d{1,4})?$/'],
             'overhead_rate_percent' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/'],
-            'pricing_method' => ['required', Rule::enum(PricingMethod::class)],
+            'pricing_method' => [$sellable ? 'required' : 'nullable', Rule::enum(PricingMethod::class)],
             'markup_percent' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/'],
             'target_margin_percent' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/'],
             'fixed_price' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/'],
@@ -79,6 +118,33 @@ class StoreOrganizationProductRequest extends FormRequest
         $validated = parent::validated($key, $default);
 
         if ($key !== null) {
+            return $validated;
+        }
+
+        $itemKind = ItemKind::from((string) $validated['item_kind']);
+        $validated = $this->applyClassificationDefaults($validated, $itemKind);
+        $validated = $this->assertClassificationConsistency($validated, $itemKind);
+
+        if (! $validated['is_sellable']) {
+            $validated['material_cost_micro_units'] = 0;
+            $validated['labor_cost_micro_units'] = 0;
+            $validated['overhead_mode'] = OverheadMode::None->value;
+            $validated['overhead_amount_micro_units'] = 0;
+            $validated['overhead_rate_basis_points'] = 0;
+            $validated['pricing_method'] = PricingMethod::Markup->value;
+            $validated['markup_basis_points'] = 0;
+            $validated['target_margin_basis_points'] = 0;
+            $validated['fixed_price_cents'] = null;
+            $validated['minimum_price_cents'] = null;
+            $validated['allow_price_override'] = false;
+
+            foreach ([
+                'material_cost', 'labor_cost', 'overhead_amount', 'overhead_rate_percent',
+                'markup_percent', 'target_margin_percent', 'fixed_price', 'minimum_price',
+            ] as $field) {
+                unset($validated[$field]);
+            }
+
             return $validated;
         }
 

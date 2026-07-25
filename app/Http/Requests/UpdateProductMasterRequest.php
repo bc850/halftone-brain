@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ItemKind;
 use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
 use App\Models\OrganizationProduct;
@@ -41,6 +42,7 @@ class UpdateProductMasterRequest extends FormRequest
                     ->ignore($productId),
             ],
             'product_family' => ['required', Rule::enum(ProductFamily::class)],
+            'item_kind' => ['required', Rule::enum(ItemKind::class)],
             'vendor_sku' => ['nullable', 'string', 'max:100'],
             'vendor_id' => [
                 'nullable',

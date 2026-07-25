@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -26,15 +26,18 @@ type AvailableMaster = {
     name: string;
     sku: string;
     product_family: string;
+    item_kind: string;
     unit_of_measure: string;
 };
 
-defineProps<{
+const props = defineProps<{
     availableMasters: AvailableMaster[];
     vendors: Option[];
     categories: Option[];
     units: SelectOption[];
     families: SelectOption[];
+    itemKinds: SelectOption[];
+    inventoryModes: SelectOption[];
     overheadModes: SelectOption[];
     pricingMethods: SelectOption[];
 }>();
@@ -45,7 +48,39 @@ const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
 const fieldClass =
     'border-input bg-transparent dark:bg-input/30 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none';
 
-const includePricing = ref(false);
+const kindDefaults: Record<
+    string,
+    {
+        is_sellable: boolean;
+        is_purchasable: boolean;
+        inventory_tracking_mode: string;
+    }
+> = {
+    product: {
+        is_sellable: true,
+        is_purchasable: false,
+        inventory_tracking_mode: 'none',
+    },
+    material: {
+        is_sellable: false,
+        is_purchasable: true,
+        inventory_tracking_mode: 'periodic_external',
+    },
+    service: {
+        is_sellable: true,
+        is_purchasable: false,
+        inventory_tracking_mode: 'none',
+    },
+};
+
+const selectedProductId = ref('');
+const isSellable = ref(true);
+const isPurchasable = ref(false);
+const inventoryTrackingMode = ref('none');
+const purchaseUnit = ref('');
+const stockUnit = ref('');
+const usageUnit = ref('');
+
 const materialCost = ref('40');
 const laborCost = ref('30');
 const overheadMode = ref('fixed');
@@ -64,6 +99,40 @@ const preview = ref<{
 } | null>(null);
 const previewError = ref<string | null>(null);
 
+const selectedMaster = computed(() =>
+    props.availableMasters.find(
+        (master) => String(master.id) === selectedProductId.value,
+    ),
+);
+
+const selectedKindLabel = computed(() => {
+    const kind = selectedMaster.value?.item_kind;
+
+    return (
+        props.itemKinds.find((option) => option.value === kind)?.label ??
+        kind ??
+        ''
+    );
+});
+
+function applyMasterDefaults(): void {
+    const kind = selectedMaster.value?.item_kind ?? 'product';
+    const defaults = kindDefaults[kind] ?? kindDefaults.product;
+    isSellable.value = defaults.is_sellable;
+    isPurchasable.value = defaults.is_purchasable;
+    inventoryTrackingMode.value = defaults.inventory_tracking_mode;
+}
+
+watch(selectedProductId, () => {
+    applyMasterDefaults();
+});
+
+watch(isPurchasable, (purchasable) => {
+    if (!purchasable) {
+        inventoryTrackingMode.value = 'none';
+    }
+});
+
 function csrfToken(): string {
     return (
         document
@@ -73,7 +142,7 @@ function csrfToken(): string {
 }
 
 async function refreshPreview(): Promise<void> {
-    if (!slug || !includePricing.value) {
+    if (!slug || !isSellable.value) {
         preview.value = null;
         previewError.value = null;
 
@@ -140,7 +209,7 @@ async function refreshPreview(): Promise<void> {
 
 watch(
     [
-        includePricing,
+        isSellable,
         materialCost,
         laborCost,
         overheadMode,
@@ -194,6 +263,7 @@ defineOptions({
                         id="product_id"
                         name="product_id"
                         :class="fieldClass"
+                        v-model="selectedProductId"
                         required
                     >
                         <option value="">Select a product...</option>
@@ -202,24 +272,135 @@ defineOptions({
                             :key="master.id"
                             :value="master.id"
                         >
-                            {{ master.name }} ({{ master.sku }})
+                            {{ master.name }} ({{ master.sku }}) ·
+                            {{
+                                itemKinds.find(
+                                    (kind) => kind.value === master.item_kind,
+                                )?.label ?? master.item_kind
+                            }}
                         </option>
                     </select>
                     <InputError :message="errors.product_id" />
+                    <p
+                        v-if="selectedMaster"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Master kind: {{ selectedKindLabel }}
+                    </p>
                 </div>
-
-                <label class="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        name="include_pricing"
-                        value="1"
-                        v-model="includePricing"
-                    />
-                    Set organization pricing now
-                </label>
             </section>
 
-            <template v-if="includePricing">
+            <section class="grid gap-4">
+                <h2 class="text-lg font-semibold">Classification</h2>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <input
+                        type="hidden"
+                        name="is_sellable"
+                        :value="isSellable ? '1' : '0'"
+                    />
+                    <input
+                        type="hidden"
+                        name="is_purchasable"
+                        :value="isPurchasable ? '1' : '0'"
+                    />
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" value="1" v-model="isSellable" />
+                        Sellable in this organization
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            value="1"
+                            v-model="isPurchasable"
+                        />
+                        Purchasable in this organization
+                    </label>
+                    <div class="grid gap-2 sm:col-span-2">
+                        <Label for="inventory_tracking_mode"
+                            >Inventory tracking</Label
+                        >
+                        <select
+                            id="inventory_tracking_mode"
+                            name="inventory_tracking_mode"
+                            :class="fieldClass"
+                            v-model="inventoryTrackingMode"
+                            :disabled="
+                                !isPurchasable ||
+                                selectedMaster?.item_kind === 'service'
+                            "
+                        >
+                            <option
+                                v-for="mode in inventoryModes"
+                                :key="mode.value"
+                                :value="mode.value"
+                            >
+                                {{ mode.label }}
+                            </option>
+                        </select>
+                        <InputError :message="errors.inventory_tracking_mode" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="purchase_unit_of_measure"
+                            >Purchase unit</Label
+                        >
+                        <select
+                            id="purchase_unit_of_measure"
+                            name="purchase_unit_of_measure"
+                            :class="fieldClass"
+                            v-model="purchaseUnit"
+                        >
+                            <option value="">Same as master</option>
+                            <option
+                                v-for="unit in units"
+                                :key="unit.value"
+                                :value="unit.value"
+                            >
+                                {{ unit.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="stock_unit_of_measure">Stock unit</Label>
+                        <select
+                            id="stock_unit_of_measure"
+                            name="stock_unit_of_measure"
+                            :class="fieldClass"
+                            v-model="stockUnit"
+                        >
+                            <option value="">Same as master</option>
+                            <option
+                                v-for="unit in units"
+                                :key="unit.value"
+                                :value="unit.value"
+                            >
+                                {{ unit.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="usage_unit_of_measure">Usage unit</Label>
+                        <select
+                            id="usage_unit_of_measure"
+                            name="usage_unit_of_measure"
+                            :class="fieldClass"
+                            v-model="usageUnit"
+                        >
+                            <option value="">Same as master</option>
+                            <option
+                                v-for="unit in units"
+                                :key="unit.value"
+                                :value="unit.value"
+                            >
+                                {{ unit.label }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <template v-if="isSellable">
+                <input type="hidden" name="include_pricing" value="1" />
+
                 <section class="grid gap-4">
                     <h2 class="text-lg font-semibold">Cost breakdown</h2>
                     <div class="grid gap-4 sm:grid-cols-2">

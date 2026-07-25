@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InventoryTrackingMode;
+use App\Enums\ItemKind;
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
 use App\Enums\ProductFamily;
@@ -10,18 +12,23 @@ use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\AssociateOrganizationProductRequest;
 use App\Http\Requests\PreviewOrganizationProductPricingRequest;
+use App\Http\Requests\PreviewOrganizationProductUnitConversionRequest;
 use App\Http\Requests\StoreOrganizationProductRequest;
+use App\Http\Requests\StoreOrganizationProductUnitConversionRequest;
 use App\Http\Requests\UpdateOrganizationProductPricingRequest;
 use App\Http\Requests\UpdateOrganizationProductSettingsRequest;
+use App\Http\Requests\UpdateOrganizationProductUnitConversionRequest;
 use App\Http\Requests\UpdateProductMasterRequest;
 use App\Http\Resources\OrganizationProductResource;
 use App\Models\Organization;
 use App\Models\OrganizationProduct;
+use App\Models\OrganizationProductUnitConversion;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Support\Catalog\OrganizationProductCatalogService;
+use App\Support\Catalog\OrganizationProductUnitConversionService;
 use App\Support\Money;
 use App\Support\Pricing\InvalidPricingException;
 use App\Support\Pricing\PricingCalculator;
@@ -40,7 +47,10 @@ class OrganizationProductController extends Controller
     use RequiresTenantContext;
     use ScopesQueriesToTenant;
 
-    public function __construct(private OrganizationProductCatalogService $catalog) {}
+    public function __construct(
+        private OrganizationProductCatalogService $catalog,
+        private OrganizationProductUnitConversionService $conversions,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -51,7 +61,7 @@ class OrganizationProductController extends Controller
         $tenant = $this->requireTenantContext();
 
         $query = OrganizationProduct::query()
-            ->with(['product.vendor:id,name', 'product.category:id,name'])
+            ->with(['product.vendor:id,name', 'product.category:id,name', 'unitConversions'])
             ->where('organization_id', $tenant->organizationId)
             ->where('parent_account_id', $tenant->parentAccountId);
 
@@ -75,6 +85,24 @@ class OrganizationProductController extends Controller
             $query->where('is_available', $request->boolean('is_available'));
         }
 
+        $itemKind = $request->string('item_kind')->toString();
+        if ($itemKind !== '') {
+            $query->whereHas('product', fn ($productQuery) => $productQuery->where('item_kind', $itemKind));
+        }
+
+        if ($request->has('is_sellable') && $request->string('is_sellable')->toString() !== '') {
+            $query->where('is_sellable', $request->boolean('is_sellable'));
+        }
+
+        if ($request->has('is_purchasable') && $request->string('is_purchasable')->toString() !== '') {
+            $query->where('is_purchasable', $request->boolean('is_purchasable'));
+        }
+
+        $inventoryMode = $request->string('inventory_tracking_mode')->toString();
+        if ($inventoryMode !== '') {
+            $query->where('inventory_tracking_mode', $inventoryMode);
+        }
+
         $products = $query
             ->latest('id')
             ->paginate(15)
@@ -89,11 +117,21 @@ class OrganizationProductController extends Controller
                 'is_available' => $request->has('is_available') && $request->string('is_available')->toString() !== ''
                     ? $request->boolean('is_available')
                     : null,
+                'item_kind' => $itemKind !== '' ? $itemKind : null,
+                'is_sellable' => $request->has('is_sellable') && $request->string('is_sellable')->toString() !== ''
+                    ? $request->boolean('is_sellable')
+                    : null,
+                'is_purchasable' => $request->has('is_purchasable') && $request->string('is_purchasable')->toString() !== ''
+                    ? $request->boolean('is_purchasable')
+                    : null,
+                'inventory_tracking_mode' => $inventoryMode !== '' ? $inventoryMode : null,
             ],
             'families' => collect(ProductFamily::cases())->map(fn (ProductFamily $family): array => [
                 'value' => $family->value,
                 'label' => ucfirst($family->value),
             ]),
+            'itemKinds' => $this->itemKindOptions(),
+            'inventoryModes' => $this->inventoryModeOptions(),
             'canCreate' => $user->can('create', OrganizationProduct::class),
             'canAssociate' => $user->can('associate', OrganizationProduct::class),
             'canViewCost' => $tenant->canViewCost(),
@@ -116,6 +154,7 @@ class OrganizationProductController extends Controller
             'name' => $data['name'],
             'sku' => $data['sku'],
             'product_family' => $data['product_family'],
+            'item_kind' => $data['item_kind'],
             'vendor_sku' => $data['vendor_sku'] ?? null,
             'vendor_id' => $data['vendor_id'] ?? null,
             'product_category_id' => $data['product_category_id'] ?? null,
@@ -128,6 +167,12 @@ class OrganizationProductController extends Controller
         $organization = [
             'display_name' => $data['display_name'] ?? null,
             'is_available' => $request->boolean('is_available', true),
+            'is_sellable' => $data['is_sellable'],
+            'is_purchasable' => $data['is_purchasable'],
+            'inventory_tracking_mode' => $data['inventory_tracking_mode'],
+            'purchase_unit_of_measure' => $data['purchase_unit_of_measure'] ?? null,
+            'stock_unit_of_measure' => $data['stock_unit_of_measure'] ?? null,
+            'usage_unit_of_measure' => $data['usage_unit_of_measure'] ?? null,
             'lead_time_days' => $data['lead_time_days'] ?? null,
             'organization_notes' => $data['organization_notes'] ?? null,
             'material_cost_micro_units' => $data['material_cost_micro_units'],
@@ -170,7 +215,7 @@ class OrganizationProductController extends Controller
             ->where('is_active', true)
             ->whereNotIn('id', $existingProductIds)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'product_family', 'unit_of_measure']);
+            ->get(['id', 'name', 'sku', 'product_family', 'item_kind', 'unit_of_measure']);
 
         return Inertia::render('products/AddExisting', [
             ...$this->formOptions(),
@@ -204,12 +249,13 @@ class OrganizationProductController extends Controller
 
         /** @var User $user */
         $user = request()->user();
-        $organizationProduct->load(['product.vendor:id,name', 'product.category:id,name']);
+        $organizationProduct->load(['product.vendor:id,name', 'product.category:id,name', 'unitConversions']);
 
         return Inertia::render('products/Show', [
             'product' => OrganizationProductResource::make($organizationProduct, $user),
             'canUpdateMaster' => $user->can('updateMaster', $organizationProduct),
             'canUpdateSettings' => $user->can('updateSettings', $organizationProduct),
+            'canManageConversions' => $user->can('updateSettings', $organizationProduct),
             'canUpdatePricing' => $user->can('updatePricing', $organizationProduct),
             'canArchive' => $user->can('archive', $organizationProduct),
             'canViewCost' => $user->can('viewCost', $organizationProduct),
@@ -221,8 +267,13 @@ class OrganizationProductController extends Controller
         $this->authorize('updateMaster', $organizationProduct);
         $organizationProduct->load('product');
 
+        $associatedOrganizationCount = OrganizationProduct::query()
+            ->where('product_id', $organizationProduct->product_id)
+            ->count();
+
         return Inertia::render('products/EditMaster', [
             'product' => OrganizationProductResource::make($organizationProduct, request()->user()),
+            'associatedOrganizationCount' => $associatedOrganizationCount,
             ...$this->formOptions(),
         ]);
     }
@@ -243,10 +294,17 @@ class OrganizationProductController extends Controller
     public function editSettings(?Organization $organization, OrganizationProduct $organizationProduct): Response
     {
         $this->authorize('updateSettings', $organizationProduct);
-        $organizationProduct->load('product');
+        $organizationProduct->load(['product', 'unitConversions']);
 
         return Inertia::render('products/EditSettings', [
             'product' => OrganizationProductResource::make($organizationProduct, request()->user()),
+            'units' => collect(UnitOfMeasure::cases())->map(fn (UnitOfMeasure $unit): array => [
+                'value' => $unit->value,
+                'label' => $unit->label(),
+            ]),
+            'inventoryModes' => $this->inventoryModeOptions(),
+            'itemKind' => $organizationProduct->product->item_kind->value,
+            'canManageConversions' => request()->user()->can('updateSettings', $organizationProduct),
         ]);
     }
 
@@ -366,6 +424,142 @@ class OrganizationProductController extends Controller
         ]);
     }
 
+    public function storeConversion(
+        StoreOrganizationProductUnitConversionRequest $request,
+        ?Organization $organization,
+        OrganizationProduct $organizationProduct,
+    ): RedirectResponse {
+        $tenant = $this->requireTenantContext();
+
+        $this->conversions->create(
+            $tenant,
+            $request->user(),
+            $request,
+            $organizationProduct,
+            [
+                'from_unit' => (string) $request->validated('from_unit'),
+                'to_unit' => (string) $request->validated('to_unit'),
+                'numerator' => (int) $request->validated('numerator'),
+                'denominator' => (int) $request->validated('denominator'),
+                'is_active' => $request->boolean('is_active', true),
+            ],
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Unit conversion added.')]);
+
+        return redirect()->to(TenantRoute::to('products.edit-settings', $organizationProduct));
+    }
+
+    public function updateConversion(
+        UpdateOrganizationProductUnitConversionRequest $request,
+        ?Organization $organization,
+        OrganizationProduct $organizationProduct,
+        OrganizationProductUnitConversion $unitConversion,
+    ): RedirectResponse {
+        $tenant = $this->requireTenantContext();
+
+        $this->conversions->update(
+            $tenant,
+            $request->user(),
+            $request,
+            $organizationProduct,
+            $unitConversion,
+            [
+                'from_unit' => (string) $request->validated('from_unit'),
+                'to_unit' => (string) $request->validated('to_unit'),
+                'numerator' => (int) $request->validated('numerator'),
+                'denominator' => (int) $request->validated('denominator'),
+                'is_active' => $request->has('is_active')
+                    ? $request->boolean('is_active')
+                    : $unitConversion->is_active,
+            ],
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Unit conversion updated.')]);
+
+        return redirect()->to(TenantRoute::to('products.edit-settings', $organizationProduct));
+    }
+
+    public function deactivateConversion(
+        ?Organization $organization,
+        OrganizationProduct $organizationProduct,
+        OrganizationProductUnitConversion $unitConversion,
+    ): RedirectResponse {
+        $tenant = $this->requireTenantContext();
+
+        $this->conversions->deactivate(
+            $tenant,
+            request()->user(),
+            request(),
+            $organizationProduct,
+            $unitConversion,
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Unit conversion deactivated.')]);
+
+        return redirect()->to(TenantRoute::to('products.edit-settings', $organizationProduct));
+    }
+
+    public function reactivateConversion(
+        ?Organization $organization,
+        OrganizationProduct $organizationProduct,
+        OrganizationProductUnitConversion $unitConversion,
+    ): RedirectResponse {
+        $tenant = $this->requireTenantContext();
+
+        $this->conversions->reactivate(
+            $tenant,
+            request()->user(),
+            request(),
+            $organizationProduct,
+            $unitConversion,
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Unit conversion reactivated.')]);
+
+        return redirect()->to(TenantRoute::to('products.edit-settings', $organizationProduct));
+    }
+
+    public function previewConversion(
+        PreviewOrganizationProductUnitConversionRequest $request,
+        ?Organization $organization,
+        OrganizationProduct $organizationProduct,
+    ): JsonResponse {
+        $this->requireTenantContext();
+        $data = $request->validated();
+
+        $preview = $this->conversions->preview(
+            $data['from_unit'],
+            $data['to_unit'],
+            (int) $data['numerator'],
+            (int) $data['denominator'],
+        );
+
+        return response()->json($preview);
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function itemKindOptions(): array
+    {
+        return collect(ItemKind::cases())->map(fn (ItemKind $kind): array => [
+            'value' => $kind->value,
+            'label' => $kind->label(),
+        ])->all();
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function inventoryModeOptions(): array
+    {
+        return collect(InventoryTrackingMode::cases())->map(fn (InventoryTrackingMode $mode): array => [
+            'value' => $mode->value,
+            'label' => $mode->label(),
+        ])->all();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -390,6 +584,8 @@ class OrganizationProductController extends Controller
                 'value' => $family->value,
                 'label' => ucfirst($family->value),
             ]),
+            'itemKinds' => $this->itemKindOptions(),
+            'inventoryModes' => $this->inventoryModeOptions(),
             'overheadModes' => collect(OverheadMode::cases())->map(fn (OverheadMode $mode): array => [
                 'value' => $mode->value,
                 'label' => match ($mode) {

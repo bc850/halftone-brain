@@ -215,6 +215,7 @@ final class OrganizationProductCatalogService
             $product->update([
                 'name' => $masterData['name'],
                 'product_family' => $masterData['product_family'],
+                'item_kind' => $masterData['item_kind'] ?? $product->item_kind->value,
                 'sku' => $masterData['sku'],
                 'vendor_sku' => $masterData['vendor_sku'] ?? null,
                 'vendor_id' => $masterData['vendor_id'] ?? null,
@@ -258,6 +259,12 @@ final class OrganizationProductCatalogService
             $organizationProduct->update([
                 'display_name' => $settings['display_name'] ?? null,
                 'is_available' => (bool) ($settings['is_available'] ?? $organizationProduct->is_available),
+                'is_sellable' => (bool) ($settings['is_sellable'] ?? $organizationProduct->is_sellable),
+                'is_purchasable' => (bool) ($settings['is_purchasable'] ?? $organizationProduct->is_purchasable),
+                'inventory_tracking_mode' => $settings['inventory_tracking_mode'] ?? $organizationProduct->inventory_tracking_mode->value,
+                'purchase_unit_of_measure' => $settings['purchase_unit_of_measure'] ?? null,
+                'stock_unit_of_measure' => $settings['stock_unit_of_measure'] ?? null,
+                'usage_unit_of_measure' => $settings['usage_unit_of_measure'] ?? null,
                 'lead_time_days' => $settings['lead_time_days'] ?? null,
                 'notes' => $settings['notes'] ?? null,
             ]);
@@ -418,6 +425,12 @@ final class OrganizationProductCatalogService
         return [
             'display_name' => $organizationProduct->display_name,
             'is_available' => $organizationProduct->is_available,
+            'is_sellable' => $organizationProduct->is_sellable,
+            'is_purchasable' => $organizationProduct->is_purchasable,
+            'inventory_tracking_mode' => $organizationProduct->inventory_tracking_mode->value,
+            'purchase_unit_of_measure' => $organizationProduct->purchase_unit_of_measure?->value,
+            'stock_unit_of_measure' => $organizationProduct->stock_unit_of_measure?->value,
+            'usage_unit_of_measure' => $organizationProduct->usage_unit_of_measure?->value,
             'lead_time_days' => $organizationProduct->lead_time_days,
             'notes' => $organizationProduct->notes,
         ];

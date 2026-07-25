@@ -59,6 +59,7 @@ test('organization admin cannot mutate shared parent catalog without parent perm
             'name' => 'Updated',
             'sku' => $product->sku,
             'product_family' => $product->product_family->value,
+            'item_kind' => $product->item_kind->value,
             'unit_of_measure' => $product->unit_of_measure->value,
             'is_active' => true,
         ])
@@ -79,6 +80,7 @@ test('parent admin can mutate shared master data but has no automatic organizati
             'name' => 'Parent Updated',
             'sku' => $product->sku,
             'product_family' => $product->product_family->value,
+            'item_kind' => $product->item_kind->value,
             'unit_of_measure' => $product->unit_of_measure->value,
             'is_active' => true,
             'vendor_id' => null,

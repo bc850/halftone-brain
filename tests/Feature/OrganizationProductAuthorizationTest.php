@@ -73,6 +73,7 @@ test('parent permission is required for master mutation', function () {
             'name' => 'Changed',
             'sku' => $op->product->sku,
             'product_family' => $op->product->product_family->value,
+            'item_kind' => $op->product->item_kind->value,
             'unit_of_measure' => $op->product->unit_of_measure->value,
         ])
         ->assertForbidden();

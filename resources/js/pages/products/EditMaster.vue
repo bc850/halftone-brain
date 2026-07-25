@@ -24,6 +24,7 @@ type OrganizationProduct = {
         name: string;
         sku: string;
         product_family: string;
+        item_kind: string;
         unit_of_measure: string;
         description: string | null;
         is_active: boolean;
@@ -36,10 +37,12 @@ type OrganizationProduct = {
 
 const props = defineProps<{
     product: OrganizationProduct;
+    associatedOrganizationCount: number;
     vendors: Option[];
     categories: Option[];
     units: SelectOption[];
     families: SelectOption[];
+    itemKinds: SelectOption[];
 }>();
 
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
@@ -72,6 +75,27 @@ defineOptions({
             :description="product.display_name"
         />
 
+        <div class="mx-auto w-full max-w-3xl space-y-4">
+            <p
+                class="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground"
+            >
+                This product master is shared across organizations in your
+                parent account. Changes here apply everywhere this master is
+                used, including Pelican Signs and Brim Drinkware.
+            </p>
+
+            <p
+                v-if="associatedOrganizationCount > 1"
+                class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+                This master is associated with
+                {{ associatedOrganizationCount }} organizations. Editing shared
+                master fields does not change organization-specific settings
+                (availability, sellable/purchasable flags, units, or pricing)
+                for other organizations.
+            </p>
+        </div>
+
         <Form
             v-if="slug"
             v-bind="updateMaster.form([slug, product.id])"
@@ -99,6 +123,25 @@ defineOptions({
                             required
                         />
                         <InputError :message="errors.sku" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="item_kind">Item kind</Label>
+                        <select
+                            id="item_kind"
+                            name="item_kind"
+                            :class="fieldClass"
+                            :value="master?.item_kind ?? 'product'"
+                            required
+                        >
+                            <option
+                                v-for="kind in itemKinds"
+                                :key="kind.value"
+                                :value="kind.value"
+                            >
+                                {{ kind.label }}
+                            </option>
+                        </select>
+                        <InputError :message="errors.item_kind" />
                     </div>
                     <div class="grid gap-2">
                         <Label for="product_family">Product family</Label>

@@ -78,6 +78,17 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
             ->name('products.update-pricing');
         Route::post('products/{organizationProduct}/archive', [OrganizationProductController::class, 'archive'])
             ->name('products.archive');
+
+        Route::post('products/{organizationProduct}/conversions/preview', [OrganizationProductController::class, 'previewConversion'])
+            ->name('products.conversions.preview');
+        Route::post('products/{organizationProduct}/conversions', [OrganizationProductController::class, 'storeConversion'])
+            ->name('products.conversions.store');
+        Route::patch('products/{organizationProduct}/conversions/{unitConversion}', [OrganizationProductController::class, 'updateConversion'])
+            ->name('products.conversions.update');
+        Route::post('products/{organizationProduct}/conversions/{unitConversion}/deactivate', [OrganizationProductController::class, 'deactivateConversion'])
+            ->name('products.conversions.deactivate');
+        Route::post('products/{organizationProduct}/conversions/{unitConversion}/reactivate', [OrganizationProductController::class, 'reactivateConversion'])
+            ->name('products.conversions.reactivate');
     });
 
 require __DIR__.'/settings.php';

@@ -80,6 +80,12 @@ test('settings-only update does not increment pricing version', function () {
         ->patch(route('org.products.update-settings', [$ctx['organization'], $op]), [
             'display_name' => 'Org display',
             'is_available' => true,
+            'is_sellable' => $op->is_sellable,
+            'is_purchasable' => $op->is_purchasable,
+            'inventory_tracking_mode' => $op->inventory_tracking_mode->value,
+            'purchase_unit_of_measure' => $op->purchase_unit_of_measure?->value,
+            'stock_unit_of_measure' => $op->stock_unit_of_measure?->value,
+            'usage_unit_of_measure' => $op->usage_unit_of_measure?->value,
             'lead_time_days' => 3,
             'notes' => 'settings only',
         ])

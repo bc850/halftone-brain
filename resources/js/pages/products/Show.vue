@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
 import {
@@ -12,20 +13,41 @@ import {
 import { index as legacyIndex } from '@/routes/products';
 import type { Tenant } from '@/types';
 
+type UnitConversion = {
+    id: number;
+    from_unit_label: string;
+    to_unit_label: string;
+    preview: string;
+    derived_reciprocal: string | null;
+    is_active: boolean;
+};
+
 type OrganizationProduct = {
     id: number;
     display_name: string;
     is_available: boolean;
+    is_sellable: boolean;
+    is_purchasable: boolean;
+    inventory_tracking_mode: string;
+    inventory_tracking_mode_label: string;
+    purchase_unit_of_measure: string | null;
+    stock_unit_of_measure: string | null;
+    usage_unit_of_measure: string | null;
     lead_time_days: number | null;
     organization_notes: string | null;
     pricing_method: string;
     pricing_version: number;
     unit_selling_price: string | null;
+    unit_setup_incomplete: boolean;
+    unit_setup_warning: string | null;
+    unit_conversions: UnitConversion[];
     product: {
         id: number;
         name: string;
         sku: string;
         product_family: string;
+        item_kind: string;
+        item_kind_label: string;
         unit_of_measure: string;
         description: string | null;
         is_active: boolean;
@@ -53,6 +75,7 @@ const props = defineProps<{
     product: OrganizationProduct;
     canUpdateMaster: boolean;
     canUpdateSettings: boolean;
+    canManageConversions: boolean;
     canUpdatePricing: boolean;
     canArchive: boolean;
     canViewCost: boolean;
@@ -60,6 +83,14 @@ const props = defineProps<{
 
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
     ?.slug;
+
+function formatUnit(value: string | null | undefined): string {
+    if (!value) {
+        return '—';
+    }
+
+    return value.replaceAll('_', ' ');
+}
 
 function archiveProduct(): void {
     if (!slug) {
@@ -88,10 +119,41 @@ defineOptions({
         <div
             class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
         >
-            <Heading
-                :title="product.display_name"
-                :description="product.product?.sku"
-            />
+            <div class="space-y-3">
+                <Heading
+                    :title="product.display_name"
+                    :description="product.product?.sku"
+                />
+                <div class="flex flex-wrap gap-1">
+                    <Badge variant="secondary">
+                        {{ product.product?.item_kind_label }}
+                    </Badge>
+                    <Badge v-if="product.is_sellable" variant="outline">
+                        Sellable
+                    </Badge>
+                    <Badge v-if="product.is_purchasable" variant="outline">
+                        Purchasable
+                    </Badge>
+                    <Badge
+                        v-if="
+                            product.inventory_tracking_mode ===
+                            'periodic_external'
+                        "
+                        variant="outline"
+                    >
+                        Periodic external
+                    </Badge>
+                    <Badge v-if="!product.is_available" variant="destructive">
+                        Archived
+                    </Badge>
+                    <Badge
+                        v-if="product.product && !product.product.is_active"
+                        variant="destructive"
+                    >
+                        Master inactive
+                    </Badge>
+                </div>
+            </div>
             <div class="flex flex-wrap gap-2">
                 <Button
                     v-if="canUpdateMaster && slug"
@@ -112,7 +174,7 @@ defineOptions({
                     </Link>
                 </Button>
                 <Button
-                    v-if="canUpdatePricing && slug"
+                    v-if="canUpdatePricing && product.is_sellable && slug"
                     variant="outline"
                     as-child
                 >
@@ -123,12 +185,27 @@ defineOptions({
             </div>
         </div>
 
+        <p
+            v-if="product.unit_setup_warning"
+            class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+            {{ product.unit_setup_warning }}
+        </p>
+
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="space-y-2 rounded-xl border p-4 text-sm">
-                <h2 class="font-medium">Catalog</h2>
+                <h2 class="font-medium">Shared product master</h2>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Name</span>
+                    <span>{{ product.product?.name ?? '—' }}</span>
+                </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">SKU</span>
                     <span>{{ product.product?.sku ?? '—' }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Kind</span>
+                    <span>{{ product.product?.item_kind_label ?? '—' }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Family</span>
@@ -137,21 +214,28 @@ defineOptions({
                     }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Available</span>
-                    <span>{{ product.is_available ? 'Yes' : 'No' }}</span>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Unit</span>
+                    <span class="text-muted-foreground">Master unit</span>
                     <span class="capitalize">{{
-                        product.product?.unit_of_measure?.replaceAll(
-                            '_',
-                            ' ',
-                        ) ?? '—'
+                        formatUnit(product.product?.unit_of_measure)
                     }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Lead time</span>
-                    <span>{{ product.lead_time_days ?? '—' }}</span>
+                    <span class="text-muted-foreground">Master active</span>
+                    <span>{{ product.product?.is_active ? 'Yes' : 'No' }}</span>
+                </div>
+                <div
+                    v-if="product.product?.vendor"
+                    class="flex justify-between gap-4"
+                >
+                    <span class="text-muted-foreground">Vendor</span>
+                    <span>{{ product.product.vendor.name }}</span>
+                </div>
+                <div
+                    v-if="product.product?.category"
+                    class="flex justify-between gap-4"
+                >
+                    <span class="text-muted-foreground">Category</span>
+                    <span>{{ product.product.category.name }}</span>
                 </div>
                 <p
                     v-if="product.product?.description"
@@ -162,7 +246,128 @@ defineOptions({
             </section>
 
             <section class="space-y-2 rounded-xl border p-4 text-sm">
-                <h2 class="font-medium">Pricing</h2>
+                <h2 class="font-medium">
+                    Organization availability and purchasing
+                </h2>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Available</span>
+                    <span>{{ product.is_available ? 'Yes' : 'No' }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Sellable</span>
+                    <span>{{ product.is_sellable ? 'Yes' : 'No' }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Purchasable</span>
+                    <span>{{ product.is_purchasable ? 'Yes' : 'No' }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground"
+                        >Inventory tracking</span
+                    >
+                    <span>{{ product.inventory_tracking_mode_label }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Lead time</span>
+                    <span>{{ product.lead_time_days ?? '—' }}</span>
+                </div>
+                <p
+                    v-if="product.organization_notes"
+                    class="pt-2 text-muted-foreground"
+                >
+                    {{ product.organization_notes }}
+                </p>
+            </section>
+
+            <section
+                class="space-y-2 rounded-xl border p-4 text-sm lg:col-span-2"
+            >
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="font-medium">Units and conversions</h2>
+                    <Button
+                        v-if="canManageConversions && slug"
+                        variant="outline"
+                        size="sm"
+                        as-child
+                    >
+                        <Link :href="editSettings.url([slug, product.id])">
+                            Manage units
+                        </Link>
+                    </Button>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <div
+                        class="flex justify-between gap-4 sm:flex-col sm:gap-1"
+                    >
+                        <span class="text-muted-foreground">Purchase unit</span>
+                        <span class="capitalize">{{
+                            formatUnit(product.purchase_unit_of_measure)
+                        }}</span>
+                    </div>
+                    <div
+                        class="flex justify-between gap-4 sm:flex-col sm:gap-1"
+                    >
+                        <span class="text-muted-foreground">Stock unit</span>
+                        <span class="capitalize">{{
+                            formatUnit(product.stock_unit_of_measure)
+                        }}</span>
+                    </div>
+                    <div
+                        class="flex justify-between gap-4 sm:flex-col sm:gap-1"
+                    >
+                        <span class="text-muted-foreground">Usage unit</span>
+                        <span class="capitalize">{{
+                            formatUnit(product.usage_unit_of_measure)
+                        }}</span>
+                    </div>
+                </div>
+                <div
+                    v-if="product.unit_conversions.length === 0"
+                    class="pt-2 text-muted-foreground"
+                >
+                    No unit conversions configured.
+                </div>
+                <ul v-else class="space-y-2 pt-2">
+                    <li
+                        v-for="conversion in product.unit_conversions"
+                        :key="conversion.id"
+                        class="rounded-lg border p-3"
+                        :class="{ 'opacity-60': !conversion.is_active }"
+                    >
+                        <p>{{ conversion.preview }}</p>
+                        <p
+                            v-if="conversion.derived_reciprocal"
+                            class="text-muted-foreground"
+                        >
+                            {{ conversion.derived_reciprocal }}
+                        </p>
+                        <p
+                            v-if="!conversion.is_active"
+                            class="text-muted-foreground"
+                        >
+                            Inactive
+                        </p>
+                    </li>
+                </ul>
+            </section>
+
+            <section
+                v-if="product.is_sellable"
+                class="space-y-2 rounded-xl border p-4 text-sm lg:col-span-2"
+            >
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="font-medium">Selling price and costing</h2>
+                    <Button
+                        v-if="canUpdatePricing && slug"
+                        variant="outline"
+                        size="sm"
+                        as-child
+                    >
+                        <Link :href="editPricing.url([slug, product.id])">
+                            Edit pricing
+                        </Link>
+                    </Button>
+                </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Selling price</span>
                     <span class="font-medium">

@@ -21,6 +21,7 @@ function organizationProductPayload(array $overrides = []): array
         'name' => '48x96 ACM Sign 3MM',
         'sku' => 'ACM-4896-3',
         'product_family' => ProductFamily::Signage->value,
+        'item_kind' => 'product',
         'unit_of_measure' => UnitOfMeasure::Each->value,
         'is_active' => true,
         'is_available' => true,
@@ -97,18 +98,21 @@ test('existing master can be associated without duplication and defaults unavail
         ->post(route('org.products.associate', $ctx['organization']), [
             'product_id' => $product->id,
             'include_pricing' => false,
+            'is_sellable' => false,
         ])
         ->assertRedirect();
 
     $op = OrganizationProduct::query()->where('product_id', $product->id)->first();
     expect($op)->not->toBeNull()
         ->and($op->is_available)->toBeFalse()
+        ->and($op->is_sellable)->toBeFalse()
         ->and(Product::query()->where('sku', $product->sku)->count())->toBe(1);
 
     $this->actingAs($ctx['user'])
         ->post(route('org.products.associate', $ctx['organization']), [
             'product_id' => $product->id,
             'include_pricing' => false,
+            'is_sellable' => false,
         ])
         ->assertSessionHasErrors('product_id');
 });

@@ -45,6 +45,7 @@ test('parent catalog manager with org admin can update product masters', functio
             'name' => 'Catalog Updated',
             'sku' => $product->sku,
             'product_family' => $product->product_family->value,
+            'item_kind' => $product->item_kind->value,
             'unit_of_measure' => $product->unit_of_measure->value,
             'is_active' => true,
             'vendor_id' => null,

@@ -2,6 +2,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Plus } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTenantRoute } from '@/composables/useTenantAction';
@@ -31,6 +32,10 @@ type CatalogProduct = {
     id: number;
     display_name: string;
     is_available: boolean;
+    is_sellable: boolean;
+    is_purchasable: boolean;
+    inventory_tracking_mode: string;
+    inventory_tracking_mode_label: string;
     lead_time_days: number | null;
     pricing_method: string;
     unit_selling_price: string | null;
@@ -41,7 +46,10 @@ type CatalogProduct = {
         name: string;
         sku: string;
         product_family: string;
+        item_kind: string;
+        item_kind_label: string;
         unit_of_measure: string;
+        is_active: boolean;
     } | null;
 };
 
@@ -51,8 +59,14 @@ const props = defineProps<{
         search: string;
         product_family: string | null;
         is_available: boolean | null;
+        item_kind: string | null;
+        is_sellable: boolean | null;
+        is_purchasable: boolean | null;
+        inventory_tracking_mode: string | null;
     };
     families: Option[];
+    itemKinds: Option[];
+    inventoryModes: Option[];
     canCreate: boolean;
     canAssociate: boolean;
     canViewCost: boolean;
@@ -60,6 +74,14 @@ const props = defineProps<{
 
 const fieldClass =
     'border-input bg-transparent dark:bg-input/30 h-9 rounded-md border px-3 text-sm outline-none';
+
+function booleanFilterValue(value: boolean | null): string {
+    if (value === null) {
+        return '';
+    }
+
+    return value ? '1' : '0';
+}
 
 function refresh(
     overrides: Record<string, string | number | boolean | undefined> = {},
@@ -75,6 +97,21 @@ function refresh(
                         : props.filters.is_available
                           ? '1'
                           : '0',
+                item_kind: props.filters.item_kind || undefined,
+                is_sellable:
+                    props.filters.is_sellable === null
+                        ? undefined
+                        : props.filters.is_sellable
+                          ? '1'
+                          : '0',
+                is_purchasable:
+                    props.filters.is_purchasable === null
+                        ? undefined
+                        : props.filters.is_purchasable
+                          ? '1'
+                          : '0',
+                inventory_tracking_mode:
+                    props.filters.inventory_tracking_mode || undefined,
                 ...overrides,
             },
         }),
@@ -129,7 +166,9 @@ defineOptions({
             </div>
         </div>
 
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div
+            class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center"
+        >
             <Input
                 :default-value="filters.search"
                 placeholder="Search name or SKU..."
@@ -164,13 +203,27 @@ defineOptions({
             </select>
             <select
                 :class="fieldClass"
-                :value="
-                    filters.is_available === null
-                        ? ''
-                        : filters.is_available
-                          ? '1'
-                          : '0'
+                :value="filters.item_kind ?? ''"
+                @change="
+                    refresh({
+                        item_kind:
+                            ($event.target as HTMLSelectElement).value ||
+                            undefined,
+                    })
                 "
+            >
+                <option value="">All kinds</option>
+                <option
+                    v-for="kind in itemKinds"
+                    :key="kind.value"
+                    :value="kind.value"
+                >
+                    {{ kind.label }}
+                </option>
+            </select>
+            <select
+                :class="fieldClass"
+                :value="booleanFilterValue(filters.is_available)"
                 @change="
                     refresh({
                         is_available:
@@ -185,6 +238,60 @@ defineOptions({
                 <option value="1">Available</option>
                 <option value="0">Unavailable</option>
             </select>
+            <select
+                :class="fieldClass"
+                :value="booleanFilterValue(filters.is_sellable)"
+                @change="
+                    refresh({
+                        is_sellable:
+                            ($event.target as HTMLSelectElement).value === ''
+                                ? undefined
+                                : ($event.target as HTMLSelectElement).value ===
+                                  '1',
+                    })
+                "
+            >
+                <option value="">Any sellable</option>
+                <option value="1">Sellable</option>
+                <option value="0">Not sellable</option>
+            </select>
+            <select
+                :class="fieldClass"
+                :value="booleanFilterValue(filters.is_purchasable)"
+                @change="
+                    refresh({
+                        is_purchasable:
+                            ($event.target as HTMLSelectElement).value === ''
+                                ? undefined
+                                : ($event.target as HTMLSelectElement).value ===
+                                  '1',
+                    })
+                "
+            >
+                <option value="">Any purchasable</option>
+                <option value="1">Purchasable</option>
+                <option value="0">Not purchasable</option>
+            </select>
+            <select
+                :class="fieldClass"
+                :value="filters.inventory_tracking_mode ?? ''"
+                @change="
+                    refresh({
+                        inventory_tracking_mode:
+                            ($event.target as HTMLSelectElement).value ||
+                            undefined,
+                    })
+                "
+            >
+                <option value="">Any inventory mode</option>
+                <option
+                    v-for="mode in inventoryModes"
+                    :key="mode.value"
+                    :value="mode.value"
+                >
+                    {{ mode.label }}
+                </option>
+            </select>
         </div>
 
         <div class="overflow-x-auto rounded-lg border">
@@ -192,9 +299,9 @@ defineOptions({
                 <thead class="border-b bg-muted/50">
                     <tr>
                         <th class="px-3 py-2 font-medium">Name</th>
+                        <th class="px-3 py-2 font-medium">Classification</th>
                         <th class="px-3 py-2 font-medium">SKU</th>
                         <th class="px-3 py-2 font-medium">Family</th>
-                        <th class="px-3 py-2 font-medium">Available</th>
                         <th class="px-3 py-2 font-medium">Unit</th>
                         <th class="px-3 py-2 font-medium">Selling price</th>
                         <th class="px-3 py-2 font-medium">Lead time</th>
@@ -220,12 +327,51 @@ defineOptions({
                                 {{ item.display_name }}
                             </Link>
                         </td>
+                        <td class="px-3 py-2">
+                            <div class="flex flex-wrap gap-1">
+                                <Badge variant="secondary">
+                                    {{ item.product?.item_kind_label }}
+                                </Badge>
+                                <Badge
+                                    v-if="item.is_sellable"
+                                    variant="outline"
+                                >
+                                    Sellable
+                                </Badge>
+                                <Badge
+                                    v-if="item.is_purchasable"
+                                    variant="outline"
+                                >
+                                    Purchasable
+                                </Badge>
+                                <Badge
+                                    v-if="
+                                        item.inventory_tracking_mode ===
+                                        'periodic_external'
+                                    "
+                                    variant="outline"
+                                >
+                                    Periodic external
+                                </Badge>
+                                <Badge
+                                    v-if="!item.is_available"
+                                    variant="destructive"
+                                >
+                                    Archived
+                                </Badge>
+                                <Badge
+                                    v-if="
+                                        item.product && !item.product.is_active
+                                    "
+                                    variant="destructive"
+                                >
+                                    Master inactive
+                                </Badge>
+                            </div>
+                        </td>
                         <td class="px-3 py-2">{{ item.product?.sku }}</td>
                         <td class="px-3 py-2 capitalize">
                             {{ item.product?.product_family }}
-                        </td>
-                        <td class="px-3 py-2">
-                            {{ item.is_available ? 'Yes' : 'No' }}
                         </td>
                         <td class="px-3 py-2">
                             {{ item.product?.unit_of_measure }}

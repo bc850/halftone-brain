@@ -31,6 +31,8 @@ defineProps<{
     categories: Option[];
     units: SelectOption[];
     families: SelectOption[];
+    itemKinds: SelectOption[];
+    inventoryModes: SelectOption[];
     overheadModes: SelectOption[];
     pricingMethods: SelectOption[];
 }>();
@@ -39,6 +41,39 @@ const fieldClass =
     'border-input bg-transparent dark:bg-input/30 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none';
 const textareaClass =
     'border-input bg-transparent dark:bg-input/30 min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none';
+
+const kindDefaults: Record<
+    string,
+    {
+        is_sellable: boolean;
+        is_purchasable: boolean;
+        inventory_tracking_mode: string;
+    }
+> = {
+    product: {
+        is_sellable: true,
+        is_purchasable: false,
+        inventory_tracking_mode: 'none',
+    },
+    material: {
+        is_sellable: false,
+        is_purchasable: true,
+        inventory_tracking_mode: 'periodic_external',
+    },
+    service: {
+        is_sellable: true,
+        is_purchasable: false,
+        inventory_tracking_mode: 'none',
+    },
+};
+
+const itemKind = ref('product');
+const isSellable = ref(true);
+const isPurchasable = ref(false);
+const inventoryTrackingMode = ref('none');
+const purchaseUnit = ref('');
+const stockUnit = ref('');
+const usageUnit = ref('');
 
 const materialCost = ref('40');
 const laborCost = ref('30');
@@ -61,6 +96,23 @@ const previewError = ref<string | null>(null);
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
     ?.slug;
 
+function applyKindDefaults(kind: string): void {
+    const defaults = kindDefaults[kind] ?? kindDefaults.product;
+    isSellable.value = defaults.is_sellable;
+    isPurchasable.value = defaults.is_purchasable;
+    inventoryTrackingMode.value = defaults.inventory_tracking_mode;
+}
+
+watch(itemKind, (kind) => {
+    applyKindDefaults(kind);
+});
+
+watch(isPurchasable, (purchasable) => {
+    if (!purchasable) {
+        inventoryTrackingMode.value = 'none';
+    }
+});
+
 function csrfToken(): string {
     return (
         document
@@ -70,7 +122,10 @@ function csrfToken(): string {
 }
 
 async function refreshPreview(): Promise<void> {
-    if (!slug) {
+    if (!slug || !isSellable.value) {
+        preview.value = null;
+        previewError.value = null;
+
         return;
     }
 
@@ -134,6 +189,7 @@ async function refreshPreview(): Promise<void> {
 
 watch(
     [
+        isSellable,
         materialCost,
         laborCost,
         overheadMode,
@@ -151,6 +207,7 @@ watch(
 );
 
 onMounted(() => {
+    applyKindDefaults(itemKind.value);
     void refreshPreview();
 });
 
@@ -193,6 +250,25 @@ defineOptions({
                         <Label for="sku">SKU</Label>
                         <Input id="sku" name="sku" required />
                         <InputError :message="errors.sku" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="item_kind">Item kind</Label>
+                        <select
+                            id="item_kind"
+                            name="item_kind"
+                            :class="fieldClass"
+                            v-model="itemKind"
+                            required
+                        >
+                            <option
+                                v-for="kind in itemKinds"
+                                :key="kind.value"
+                                :value="kind.value"
+                            >
+                                {{ kind.label }}
+                            </option>
+                        </select>
+                        <InputError :message="errors.item_kind" />
                     </div>
                     <div class="grid gap-2">
                         <Label for="product_family">Product family</Label>
@@ -337,162 +413,277 @@ defineOptions({
             </section>
 
             <section class="grid gap-4">
-                <h2 class="text-lg font-semibold">Cost breakdown</h2>
+                <h2 class="text-lg font-semibold">Classification</h2>
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="grid gap-2">
-                        <Label for="material_cost">Material cost</Label>
-                        <Input
-                            id="material_cost"
-                            name="material_cost"
-                            v-model="materialCost"
-                            required
+                    <input
+                        type="hidden"
+                        name="is_sellable"
+                        :value="isSellable ? '1' : '0'"
+                    />
+                    <input
+                        type="hidden"
+                        name="is_purchasable"
+                        :value="isPurchasable ? '1' : '0'"
+                    />
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" value="1" v-model="isSellable" />
+                        Sellable in this organization
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            value="1"
+                            v-model="isPurchasable"
                         />
-                        <InputError :message="errors.material_cost" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="labor_cost">Labor cost</Label>
-                        <Input
-                            id="labor_cost"
-                            name="labor_cost"
-                            v-model="laborCost"
-                            required
-                        />
-                        <InputError :message="errors.labor_cost" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="overhead_mode">Overhead</Label>
+                        Purchasable in this organization
+                    </label>
+                    <div class="grid gap-2 sm:col-span-2">
+                        <Label for="inventory_tracking_mode"
+                            >Inventory tracking</Label
+                        >
                         <select
-                            id="overhead_mode"
-                            name="overhead_mode"
+                            id="inventory_tracking_mode"
+                            name="inventory_tracking_mode"
                             :class="fieldClass"
-                            v-model="overheadMode"
-                            required
+                            v-model="inventoryTrackingMode"
+                            :disabled="!isPurchasable || itemKind === 'service'"
                         >
                             <option
-                                v-for="mode in overheadModes"
+                                v-for="mode in inventoryModes"
                                 :key="mode.value"
                                 :value="mode.value"
                             >
                                 {{ mode.label }}
                             </option>
                         </select>
+                        <InputError :message="errors.inventory_tracking_mode" />
                     </div>
                     <div class="grid gap-2">
-                        <Label for="overhead_amount">Overhead amount</Label>
-                        <Input
-                            id="overhead_amount"
-                            name="overhead_amount"
-                            v-model="overheadAmount"
-                        />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="overhead_rate_percent"
-                            >Overhead rate percent</Label
+                        <Label for="purchase_unit_of_measure"
+                            >Purchase unit</Label
                         >
-                        <Input
-                            id="overhead_rate_percent"
-                            name="overhead_rate_percent"
-                            v-model="overheadRatePercent"
-                        />
-                    </div>
-                </div>
-            </section>
-
-            <section class="grid gap-4">
-                <h2 class="text-lg font-semibold">Pricing method</h2>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label for="pricing_method">Method</Label>
                         <select
-                            id="pricing_method"
-                            name="pricing_method"
+                            id="purchase_unit_of_measure"
+                            name="purchase_unit_of_measure"
                             :class="fieldClass"
-                            v-model="pricingMethod"
-                            required
+                            v-model="purchaseUnit"
                         >
+                            <option value="">Same as master</option>
                             <option
-                                v-for="method in pricingMethods"
-                                :key="method.value"
-                                :value="method.value"
+                                v-for="unit in units"
+                                :key="unit.value"
+                                :value="unit.value"
                             >
-                                {{ method.label }}
+                                {{ unit.label }}
                             </option>
                         </select>
                     </div>
                     <div class="grid gap-2">
-                        <Label for="markup_percent">Markup on cost (%)</Label>
-                        <Input
-                            id="markup_percent"
-                            name="markup_percent"
-                            v-model="markupPercent"
-                        />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="target_margin_percent"
-                            >Target margin on selling price (%)</Label
+                        <Label for="stock_unit_of_measure">Stock unit</Label>
+                        <select
+                            id="stock_unit_of_measure"
+                            name="stock_unit_of_measure"
+                            :class="fieldClass"
+                            v-model="stockUnit"
                         >
-                        <Input
-                            id="target_margin_percent"
-                            name="target_margin_percent"
-                            v-model="targetMarginPercent"
-                        />
+                            <option value="">Same as master</option>
+                            <option
+                                v-for="unit in units"
+                                :key="unit.value"
+                                :value="unit.value"
+                            >
+                                {{ unit.label }}
+                            </option>
+                        </select>
                     </div>
                     <div class="grid gap-2">
-                        <Label for="fixed_price">Fixed selling price</Label>
-                        <Input
-                            id="fixed_price"
-                            name="fixed_price"
-                            v-model="fixedPrice"
-                        />
+                        <Label for="usage_unit_of_measure">Usage unit</Label>
+                        <select
+                            id="usage_unit_of_measure"
+                            name="usage_unit_of_measure"
+                            :class="fieldClass"
+                            v-model="usageUnit"
+                        >
+                            <option value="">Same as master</option>
+                            <option
+                                v-for="unit in units"
+                                :key="unit.value"
+                                :value="unit.value"
+                            >
+                                {{ unit.label }}
+                            </option>
+                        </select>
                     </div>
-                    <div class="grid gap-2">
-                        <Label for="minimum_price">Minimum selling price</Label>
-                        <Input
-                            id="minimum_price"
-                            name="minimum_price"
-                            v-model="minimumPrice"
-                        />
-                    </div>
-                    <label
-                        class="flex items-center gap-2 text-sm sm:col-span-2"
-                    >
-                        <input
-                            type="checkbox"
-                            name="allow_price_override"
-                            value="1"
-                        />
-                        Allow price override on quotes
-                    </label>
                 </div>
             </section>
 
-            <section class="grid gap-2 rounded-lg border bg-muted/40 p-4">
-                <h2 class="font-semibold">Calculated pricing preview</h2>
-                <p v-if="previewError" class="text-sm text-destructive">
-                    {{ previewError }}
-                </p>
-                <template v-else-if="preview">
-                    <p class="text-sm">Unit cost: ${{ preview.unit_cost }}</p>
-                    <p class="text-sm">
-                        Unit selling price: ${{ preview.unit_selling_price }}
+            <template v-if="isSellable">
+                <section class="grid gap-4">
+                    <h2 class="text-lg font-semibold">Cost breakdown</h2>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-2">
+                            <Label for="material_cost">Material cost</Label>
+                            <Input
+                                id="material_cost"
+                                name="material_cost"
+                                v-model="materialCost"
+                                required
+                            />
+                            <InputError :message="errors.material_cost" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="labor_cost">Labor cost</Label>
+                            <Input
+                                id="labor_cost"
+                                name="labor_cost"
+                                v-model="laborCost"
+                                required
+                            />
+                            <InputError :message="errors.labor_cost" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="overhead_mode">Overhead</Label>
+                            <select
+                                id="overhead_mode"
+                                name="overhead_mode"
+                                :class="fieldClass"
+                                v-model="overheadMode"
+                                required
+                            >
+                                <option
+                                    v-for="mode in overheadModes"
+                                    :key="mode.value"
+                                    :value="mode.value"
+                                >
+                                    {{ mode.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="overhead_amount">Overhead amount</Label>
+                            <Input
+                                id="overhead_amount"
+                                name="overhead_amount"
+                                v-model="overheadAmount"
+                            />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="overhead_rate_percent"
+                                >Overhead rate percent</Label
+                            >
+                            <Input
+                                id="overhead_rate_percent"
+                                name="overhead_rate_percent"
+                                v-model="overheadRatePercent"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid gap-4">
+                    <h2 class="text-lg font-semibold">Pricing method</h2>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-2 sm:col-span-2">
+                            <Label for="pricing_method">Method</Label>
+                            <select
+                                id="pricing_method"
+                                name="pricing_method"
+                                :class="fieldClass"
+                                v-model="pricingMethod"
+                                required
+                            >
+                                <option
+                                    v-for="method in pricingMethods"
+                                    :key="method.value"
+                                    :value="method.value"
+                                >
+                                    {{ method.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="markup_percent"
+                                >Markup on cost (%)</Label
+                            >
+                            <Input
+                                id="markup_percent"
+                                name="markup_percent"
+                                v-model="markupPercent"
+                            />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="target_margin_percent"
+                                >Target margin on selling price (%)</Label
+                            >
+                            <Input
+                                id="target_margin_percent"
+                                name="target_margin_percent"
+                                v-model="targetMarginPercent"
+                            />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="fixed_price">Fixed selling price</Label>
+                            <Input
+                                id="fixed_price"
+                                name="fixed_price"
+                                v-model="fixedPrice"
+                            />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="minimum_price"
+                                >Minimum selling price</Label
+                            >
+                            <Input
+                                id="minimum_price"
+                                name="minimum_price"
+                                v-model="minimumPrice"
+                            />
+                        </div>
+                        <label
+                            class="flex items-center gap-2 text-sm sm:col-span-2"
+                        >
+                            <input
+                                type="checkbox"
+                                name="allow_price_override"
+                                value="1"
+                            />
+                            Allow price override on quotes
+                        </label>
+                    </div>
+                </section>
+
+                <section class="grid gap-2 rounded-lg border bg-muted/40 p-4">
+                    <h2 class="font-semibold">Calculated pricing preview</h2>
+                    <p v-if="previewError" class="text-sm text-destructive">
+                        {{ previewError }}
                     </p>
-                    <p
-                        v-if="preview.below_minimum"
-                        class="text-sm text-destructive"
-                    >
-                        Price is below minimum.
-                    </p>
-                    <p
-                        v-for="warning in preview.warnings"
-                        :key="warning"
-                        class="text-sm text-amber-700"
-                    >
-                        {{ warning }}
-                    </p>
-                </template>
-                <InputError :message="errors.pricing" />
-                <InputError :message="errors.minimum_price" />
-            </section>
+                    <template v-else-if="preview">
+                        <p class="text-sm">
+                            Unit cost: ${{ preview.unit_cost }}
+                        </p>
+                        <p class="text-sm">
+                            Unit selling price: ${{
+                                preview.unit_selling_price
+                            }}
+                        </p>
+                        <p
+                            v-if="preview.below_minimum"
+                            class="text-sm text-destructive"
+                        >
+                            Price is below minimum.
+                        </p>
+                        <p
+                            v-for="warning in preview.warnings"
+                            :key="warning"
+                            class="text-sm text-amber-700"
+                        >
+                            {{ warning }}
+                        </p>
+                    </template>
+                    <InputError :message="errors.pricing" />
+                    <InputError :message="errors.minimum_price" />
+                </section>
+            </template>
 
             <div class="flex gap-3">
                 <Button type="submit" :disabled="processing"
