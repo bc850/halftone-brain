@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
+use App\Support\Pricing\OrganizationProductPricingMapper;
+use App\Support\Pricing\PricingCalculator;
+use App\Support\Pricing\PricingInput;
 use Database\Factories\OrganizationProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -110,5 +113,21 @@ class OrganizationProduct extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Map this record into immutable pricing facts for {@see PricingCalculator}.
+     *
+     * Does not consult Product Master legacy cost/price columns and performs no writes.
+     */
+    public function toPricingInput(
+        string $quantity = '1',
+        ?int $requestedOverridePriceCents = null,
+    ): PricingInput {
+        return (new OrganizationProductPricingMapper)->toPricingInput(
+            $this,
+            $quantity,
+            $requestedOverridePriceCents,
+        );
     }
 }

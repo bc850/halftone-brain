@@ -60,24 +60,21 @@ trait AuthorizesWithTenant
     {
         $tenant = $this->tenant();
 
-        return $tenant !== null
-            && ($product->parent_account_id === null || $product->parent_account_id === $tenant->parentAccountId);
+        return $tenant !== null && $product->parent_account_id === $tenant->parentAccountId;
     }
 
     protected function vendorInCurrentParent(Vendor $vendor): bool
     {
         $tenant = $this->tenant();
 
-        return $tenant !== null
-            && ($vendor->parent_account_id === null || $vendor->parent_account_id === $tenant->parentAccountId);
+        return $tenant !== null && $vendor->parent_account_id === $tenant->parentAccountId;
     }
 
     protected function categoryInCurrentParent(ProductCategory $category): bool
     {
         $tenant = $this->tenant();
 
-        return $tenant !== null
-            && ($category->parent_account_id === null || $category->parent_account_id === $tenant->parentAccountId);
+        return $tenant !== null && $category->parent_account_id === $tenant->parentAccountId;
     }
 
     protected function ownsDeal(User $user, Deal $deal): bool
