@@ -37,6 +37,7 @@ function withOrganizationArgs(slug: string, args: unknown[]): unknown[] {
             !('contact' in first) &&
             !('deal' in first) &&
             !('product' in first) &&
+            !('organizationProduct' in first) &&
             !('vendor' in first) &&
             !('category' in first))
     ) {

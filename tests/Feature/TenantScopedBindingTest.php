@@ -8,7 +8,7 @@ use App\Models\Deal;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
-use App\Models\Product;
+use App\Models\OrganizationProduct;
 use App\Models\Team;
 use App\Models\Vendor;
 use Illuminate\Support\Facades\Route;
@@ -71,12 +71,13 @@ test('cross parent product access returns 404', function () {
     $fixture = createTenantUser('admin');
     $other = createTenantUser('admin');
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $other['parent']->id,
+        'organization_id' => $other['organization']->id,
     ]);
 
     $this->actingAs($fixture['user'])
-        ->get(route('org.products.show', [$fixture['organization'], $product]))
+        ->get(route('org.products.show', [$fixture['organization'], $op]))
         ->assertNotFound();
 });
 

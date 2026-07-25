@@ -1,66 +1,73 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Pencil } from '@lucide/vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
-import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as legacyShowCategory } from '@/routes/categories';
-import { show as orgShowCategory } from '@/routes/org/categories';
 import {
-    destroy as orgDestroy,
-    edit as orgEdit,
-    show as orgShowProduct,
+    archive,
+    editMaster,
+    editPricing,
+    editSettings,
 } from '@/routes/org/products';
-import { show as orgShowVendor } from '@/routes/org/vendors';
-import {
-    destroy as legacyDestroy,
-    edit as legacyEdit,
-    index as legacyIndex,
-    show as legacyShowProduct,
-} from '@/routes/products';
-import { show as legacyShowVendor } from '@/routes/vendors';
+import { index as legacyIndex } from '@/routes/products';
+import type { Tenant } from '@/types';
 
-const destroy = useTenantRoute(legacyDestroy, orgDestroy);
-const edit = useTenantRoute(legacyEdit, orgEdit);
-const showProduct = useTenantRoute(legacyShowProduct, orgShowProduct);
-const showCategory = useTenantRoute(legacyShowCategory, orgShowCategory);
-const showVendor = useTenantRoute(legacyShowVendor, orgShowVendor);
-
-type Related = {
+type OrganizationProduct = {
     id: number;
-    name: string;
-    sku: string;
-    list_price: string | null;
-};
-
-type Product = {
-    id: number;
-    name: string;
-    sku: string;
-    vendor_sku?: string | null;
-    unit_of_measure: string;
-    true_cost?: string;
+    display_name: string;
+    is_available: boolean;
+    lead_time_days: number | null;
+    organization_notes: string | null;
+    pricing_method: string;
+    pricing_version: number;
+    unit_selling_price: string | null;
+    product: {
+        id: number;
+        name: string;
+        sku: string;
+        product_family: string;
+        unit_of_measure: string;
+        description: string | null;
+        is_active: boolean;
+        vendor_sku?: string | null;
+        notes?: string | null;
+        vendor?: { id: number; name: string } | null;
+        category?: { id: number; name: string } | null;
+    } | null;
+    material_cost?: string;
+    labor_cost?: string;
+    overhead_mode?: string;
+    overhead_amount?: string;
+    overhead_rate_percent?: string;
     markup_percent?: string;
-    list_price: string | null;
-    suggested_sell_price: string;
-    description: string | null;
-    notes?: string | null;
-    is_active: boolean;
-    vendor?: { id: number; name: string } | null;
-    category?: { id: number; name: string } | null;
-    related_products?: Related[];
+    target_margin_percent?: string;
+    fixed_price?: string | null;
+    minimum_price?: string | null;
+    allow_price_override?: boolean;
+    unit_cost?: string | null;
+    below_minimum?: boolean;
+    pricing_warnings?: string[];
 };
 
 const props = defineProps<{
-    product: Product;
-    canManage: boolean;
+    product: OrganizationProduct;
+    canUpdateMaster: boolean;
+    canUpdateSettings: boolean;
+    canUpdatePricing: boolean;
+    canArchive: boolean;
     canViewCost: boolean;
 }>();
 
-function deleteProduct(): void {
-    if (confirm('Delete this product?')) {
-        router.delete(destroy.url(props.product.id));
+const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
+    ?.slug;
+
+function archiveProduct(): void {
+    if (!slug) {
+        return;
+    }
+
+    if (confirm('Archive this product for this organization?')) {
+        router.post(archive.url([slug, props.product.id]));
     }
 }
 
@@ -69,150 +76,184 @@ defineOptions({
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
             { title: 'Products', href: legacyIndex() },
-            { title: 'Product', href: legacyIndex() },
         ],
     },
 });
 </script>
 
 <template>
-    <Head :title="product.name" />
+    <Head :title="product.display_name" />
 
     <div class="flex flex-col gap-6 p-4">
         <div
             class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
         >
             <Heading
-                :title="product.name"
-                :description="
-                    product.is_active
-                        ? product.sku
-                        : `${product.sku} · Inactive`
-                "
+                :title="product.display_name"
+                :description="product.product?.sku"
             />
-            <Button v-if="canManage" variant="outline" as-child>
-                <Link :href="edit(product.id)">
-                    <Pencil class="size-4" />
-                    Edit
-                </Link>
-            </Button>
+            <div class="flex flex-wrap gap-2">
+                <Button
+                    v-if="canUpdateMaster && slug"
+                    variant="outline"
+                    as-child
+                >
+                    <Link :href="editMaster.url([slug, product.id])">
+                        Edit master
+                    </Link>
+                </Button>
+                <Button
+                    v-if="canUpdateSettings && slug"
+                    variant="outline"
+                    as-child
+                >
+                    <Link :href="editSettings.url([slug, product.id])">
+                        Edit settings
+                    </Link>
+                </Button>
+                <Button
+                    v-if="canUpdatePricing && slug"
+                    variant="outline"
+                    as-child
+                >
+                    <Link :href="editPricing.url([slug, product.id])">
+                        Edit pricing
+                    </Link>
+                </Button>
+            </div>
         </div>
 
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="space-y-2 rounded-xl border p-4 text-sm">
                 <h2 class="font-medium">Catalog</h2>
                 <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Vendor</span>
-                    <Link
-                        v-if="product.vendor"
-                        :href="showVendor(product.vendor.id)"
-                        class="hover:underline"
-                    >
-                        {{ product.vendor.name }}
-                    </Link>
-                    <span v-else>—</span>
-                </div>
-                <div v-if="canViewCost" class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Vendor SKU</span>
-                    <span>{{ product.vendor_sku ?? '—' }}</span>
+                    <span class="text-muted-foreground">SKU</span>
+                    <span>{{ product.product?.sku ?? '—' }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Category</span>
-                    <Link
-                        v-if="product.category"
-                        :href="showCategory(product.category.id)"
-                        class="hover:underline"
-                    >
-                        {{ product.category.name }}
-                    </Link>
-                    <span v-else>—</span>
+                    <span class="text-muted-foreground">Family</span>
+                    <span class="capitalize">{{
+                        product.product?.product_family ?? '—'
+                    }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Available</span>
+                    <span>{{ product.is_available ? 'Yes' : 'No' }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Unit</span>
                     <span class="capitalize">{{
-                        product.unit_of_measure.replaceAll('_', ' ')
+                        product.product?.unit_of_measure?.replaceAll(
+                            '_',
+                            ' ',
+                        ) ?? '—'
                     }}</span>
                 </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Lead time</span>
+                    <span>{{ product.lead_time_days ?? '—' }}</span>
+                </div>
                 <p
-                    v-if="product.description"
+                    v-if="product.product?.description"
                     class="pt-2 text-muted-foreground"
                 >
-                    {{ product.description }}
+                    {{ product.product.description }}
                 </p>
             </section>
 
             <section class="space-y-2 rounded-xl border p-4 text-sm">
                 <h2 class="font-medium">Pricing</h2>
-                <template v-if="canViewCost">
-                    <div class="flex justify-between gap-4">
-                        <span class="text-muted-foreground">True cost</span>
-                        <span>${{ product.true_cost }}</span>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <span class="text-muted-foreground">Markup</span>
-                        <span>{{ product.markup_percent }}%</span>
-                    </div>
-                </template>
                 <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">Suggested sell</span>
-                    <span class="font-medium"
-                        >${{ product.suggested_sell_price }}</span
-                    >
-                </div>
-                <div class="flex justify-between gap-4">
-                    <span class="text-muted-foreground">List price</span>
-                    <span>
+                    <span class="text-muted-foreground">Selling price</span>
+                    <span class="font-medium">
                         {{
-                            product.list_price ? `$${product.list_price}` : '—'
+                            product.unit_selling_price
+                                ? `$${product.unit_selling_price}`
+                                : '—'
                         }}
                     </span>
                 </div>
-                <p
-                    v-if="canViewCost && product.notes"
-                    class="pt-2 text-muted-foreground"
-                >
-                    {{ product.notes }}
-                </p>
-            </section>
-
-            <section
-                v-if="product.related_products"
-                class="space-y-3 rounded-xl border p-4 lg:col-span-2"
-            >
-                <h2 class="font-medium">Related products</h2>
-                <ul class="divide-y text-sm">
-                    <li
-                        v-for="related in product.related_products"
-                        :key="related.id"
-                        class="flex justify-between gap-3 py-2"
-                    >
-                        <Link
-                            :href="showProduct(related.id)"
-                            class="hover:underline"
+                <template v-if="canViewCost">
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground"
+                            >Pricing method</span
                         >
-                            {{ related.name }}
-                        </Link>
-                        <span class="text-muted-foreground">{{
-                            related.sku
+                        <span class="capitalize">{{
+                            product.pricing_method.replaceAll('_', ' ')
                         }}</span>
-                    </li>
-                    <li
-                        v-if="product.related_products.length === 0"
-                        class="py-4 text-muted-foreground"
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground">Unit cost</span>
+                        <span>{{
+                            product.unit_cost ? `$${product.unit_cost}` : '—'
+                        }}</span>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground">Material cost</span>
+                        <span>${{ product.material_cost }}</span>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground">Labor cost</span>
+                        <span>${{ product.labor_cost }}</span>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground">Overhead</span>
+                        <span class="capitalize">{{
+                            product.overhead_mode?.replaceAll('_', ' ') ?? '—'
+                        }}</span>
+                    </div>
+                    <div
+                        v-if="product.markup_percent"
+                        class="flex justify-between gap-4"
                     >
-                        No related products.
-                    </li>
-                </ul>
+                        <span class="text-muted-foreground">Markup</span>
+                        <span>{{ product.markup_percent }}%</span>
+                    </div>
+                    <div
+                        v-if="product.target_margin_percent"
+                        class="flex justify-between gap-4"
+                    >
+                        <span class="text-muted-foreground">Target margin</span>
+                        <span>{{ product.target_margin_percent }}%</span>
+                    </div>
+                    <div
+                        v-if="product.fixed_price"
+                        class="flex justify-between gap-4"
+                    >
+                        <span class="text-muted-foreground">Fixed price</span>
+                        <span>${{ product.fixed_price }}</span>
+                    </div>
+                    <div
+                        v-if="product.minimum_price"
+                        class="flex justify-between gap-4"
+                    >
+                        <span class="text-muted-foreground">Minimum price</span>
+                        <span>${{ product.minimum_price }}</span>
+                    </div>
+                    <p
+                        v-if="product.below_minimum"
+                        class="pt-2 text-destructive"
+                    >
+                        Price is below minimum.
+                    </p>
+                    <p
+                        v-for="warning in product.pricing_warnings ?? []"
+                        :key="warning"
+                        class="pt-1 text-amber-700"
+                    >
+                        {{ warning }}
+                    </p>
+                </template>
             </section>
         </div>
 
         <Button
-            v-if="canManage"
+            v-if="canArchive"
             variant="destructive"
             class="w-fit"
-            @click="deleteProduct"
+            @click="archiveProduct"
         >
-            Delete product
+            Archive product
         </Button>
     </div>
 </template>

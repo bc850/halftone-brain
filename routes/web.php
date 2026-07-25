@@ -3,6 +3,7 @@
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
+use App\Http\Controllers\OrganizationProductController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VendorController;
@@ -51,7 +52,32 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
         Route::resource('vendors', VendorController::class);
         Route::resource('categories', ProductCategoryController::class)
             ->parameters(['categories' => 'category']);
-        Route::resource('products', ProductController::class);
+
+        Route::get('products/add-existing', [OrganizationProductController::class, 'createFromMaster'])
+            ->name('products.add-existing');
+        Route::post('products/associate', [OrganizationProductController::class, 'associate'])
+            ->name('products.associate');
+        Route::post('products/pricing-preview', [OrganizationProductController::class, 'previewPricing'])
+            ->name('products.pricing-preview');
+
+        Route::resource('products', OrganizationProductController::class)
+            ->parameters(['products' => 'organizationProduct'])
+            ->except(['edit', 'update', 'destroy']);
+
+        Route::get('products/{organizationProduct}/edit-master', [OrganizationProductController::class, 'editMaster'])
+            ->name('products.edit-master');
+        Route::patch('products/{organizationProduct}/master', [OrganizationProductController::class, 'updateMaster'])
+            ->name('products.update-master');
+        Route::get('products/{organizationProduct}/edit-settings', [OrganizationProductController::class, 'editSettings'])
+            ->name('products.edit-settings');
+        Route::patch('products/{organizationProduct}/settings', [OrganizationProductController::class, 'updateSettings'])
+            ->name('products.update-settings');
+        Route::get('products/{organizationProduct}/edit-pricing', [OrganizationProductController::class, 'editPricing'])
+            ->name('products.edit-pricing');
+        Route::patch('products/{organizationProduct}/pricing', [OrganizationProductController::class, 'updatePricing'])
+            ->name('products.update-pricing');
+        Route::post('products/{organizationProduct}/archive', [OrganizationProductController::class, 'archive'])
+            ->name('products.archive');
     });
 
 require __DIR__.'/settings.php';

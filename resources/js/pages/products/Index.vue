@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Plus } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
 import {
+    addExisting as orgAddExisting,
     create as orgCreate,
     index as orgIndex,
     show as orgShow,
@@ -16,36 +17,44 @@ import {
     index as legacyIndex,
     show as legacyShow,
 } from '@/routes/products';
+import type { Tenant } from '@/types';
 
 const create = useTenantRoute(legacyCreate, orgCreate);
 const index = useTenantRoute(legacyIndex, orgIndex);
 const show = useTenantRoute(legacyShow, orgShow);
+const organizationSlug = (usePage().props.tenant as Tenant | null | undefined)
+    ?.organization?.slug;
 
-type Option = { id: number; name: string };
+type Option = { value: string; label: string };
 
-type Product = {
+type CatalogProduct = {
     id: number;
-    name: string;
-    sku: string;
-    true_cost?: string;
-    markup_percent?: string;
-    list_price: string | null;
-    suggested_sell_price: string;
-    is_active: boolean;
-    vendor?: Option | null;
-    category?: Option | null;
+    display_name: string;
+    is_available: boolean;
+    lead_time_days: number | null;
+    pricing_method: string;
+    unit_selling_price: string | null;
+    material_cost?: string;
+    unit_cost?: string;
+    product: {
+        id: number;
+        name: string;
+        sku: string;
+        product_family: string;
+        unit_of_measure: string;
+    } | null;
 };
 
 const props = defineProps<{
-    products: { data: Product[] };
+    products: { data: CatalogProduct[] };
     filters: {
         search: string;
-        category_id: number | null;
-        vendor_id: number | null;
+        product_family: string | null;
+        is_available: boolean | null;
     };
-    categories: Option[];
-    vendors: Option[];
-    canManage: boolean;
+    families: Option[];
+    canCreate: boolean;
+    canAssociate: boolean;
     canViewCost: boolean;
 }>();
 
@@ -53,24 +62,25 @@ const fieldClass =
     'border-input bg-transparent dark:bg-input/30 h-9 rounded-md border px-3 text-sm outline-none';
 
 function refresh(
-    overrides: Record<string, string | number | undefined> = {},
+    overrides: Record<string, string | number | boolean | undefined> = {},
 ): void {
     router.get(
         index.url({
             query: {
                 search: props.filters.search || undefined,
-                category_id: props.filters.category_id || undefined,
-                vendor_id: props.filters.vendor_id || undefined,
+                product_family: props.filters.product_family || undefined,
+                is_available:
+                    props.filters.is_available === null
+                        ? undefined
+                        : props.filters.is_available
+                          ? '1'
+                          : '0',
                 ...overrides,
             },
         }),
         {},
         { preserveState: true, replace: true },
     );
-}
-
-function onSearch(event: Event): void {
-    refresh({ search: (event.target as HTMLInputElement).value || undefined });
 }
 
 defineOptions({
@@ -91,139 +101,154 @@ defineOptions({
             class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         >
             <Heading
-                title="Products"
+                title="Organization catalog"
                 :description="
                     canViewCost
-                        ? 'Catalog with true cost, markup, and suggested sell price'
-                        : 'Product catalog with list and suggested pricing'
+                        ? 'Products available to this organization with costs and pricing'
+                        : 'Products available to this organization'
                 "
             />
-            <Button v-if="canManage" as-child>
-                <Link :href="create()">
-                    <Plus class="size-4" />
-                    New product
-                </Link>
-            </Button>
+            <div class="flex flex-wrap gap-2">
+                <Button v-if="canAssociate" variant="outline" as-child>
+                    <Link
+                        :href="
+                            organizationSlug
+                                ? orgAddExisting.url(organizationSlug)
+                                : '#'
+                        "
+                    >
+                        Add existing
+                    </Link>
+                </Button>
+                <Button v-if="canCreate" as-child>
+                    <Link :href="create()">
+                        <Plus class="size-4" />
+                        New product
+                    </Link>
+                </Button>
+            </div>
         </div>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
                 :default-value="filters.search"
-                placeholder="Search SKU or name..."
+                placeholder="Search name or SKU..."
                 class="max-w-sm"
-                @change="onSearch"
+                @change="
+                    refresh({
+                        search:
+                            ($event.target as HTMLInputElement).value ||
+                            undefined,
+                    })
+                "
             />
             <select
                 :class="fieldClass"
-                :value="filters.category_id ?? ''"
+                :value="filters.product_family ?? ''"
                 @change="
                     refresh({
-                        category_id:
+                        product_family:
                             ($event.target as HTMLSelectElement).value ||
                             undefined,
                     })
                 "
             >
-                <option value="">All categories</option>
+                <option value="">All families</option>
                 <option
-                    v-for="category in categories"
-                    :key="category.id"
-                    :value="category.id"
+                    v-for="family in families"
+                    :key="family.value"
+                    :value="family.value"
                 >
-                    {{ category.name }}
+                    {{ family.label }}
                 </option>
             </select>
             <select
                 :class="fieldClass"
-                :value="filters.vendor_id ?? ''"
+                :value="
+                    filters.is_available === null
+                        ? ''
+                        : filters.is_available
+                          ? '1'
+                          : '0'
+                "
                 @change="
                     refresh({
-                        vendor_id:
-                            ($event.target as HTMLSelectElement).value ||
-                            undefined,
+                        is_available:
+                            ($event.target as HTMLSelectElement).value === ''
+                                ? undefined
+                                : ($event.target as HTMLSelectElement).value ===
+                                  '1',
                     })
                 "
             >
-                <option value="">All vendors</option>
-                <option
-                    v-for="vendor in vendors"
-                    :key="vendor.id"
-                    :value="vendor.id"
-                >
-                    {{ vendor.name }}
-                </option>
+                <option value="">Any availability</option>
+                <option value="1">Available</option>
+                <option value="0">Unavailable</option>
             </select>
         </div>
 
-        <div class="overflow-x-auto rounded-xl border">
-            <table class="w-full min-w-[720px] text-sm">
-                <thead class="bg-muted/50 text-left">
+        <div class="overflow-x-auto rounded-lg border">
+            <table class="w-full text-left text-sm">
+                <thead class="border-b bg-muted/50">
                     <tr>
-                        <th class="px-4 py-3 font-medium">Product</th>
-                        <th class="px-4 py-3 font-medium">SKU</th>
-                        <th class="px-4 py-3 font-medium">Vendor</th>
-                        <th v-if="canViewCost" class="px-4 py-3 font-medium">
-                            True cost
+                        <th class="px-3 py-2 font-medium">Name</th>
+                        <th class="px-3 py-2 font-medium">SKU</th>
+                        <th class="px-3 py-2 font-medium">Family</th>
+                        <th class="px-3 py-2 font-medium">Available</th>
+                        <th class="px-3 py-2 font-medium">Unit</th>
+                        <th class="px-3 py-2 font-medium">Selling price</th>
+                        <th class="px-3 py-2 font-medium">Lead time</th>
+                        <th v-if="canViewCost" class="px-3 py-2 font-medium">
+                            Pricing method
                         </th>
-                        <th v-if="canViewCost" class="px-4 py-3 font-medium">
-                            Markup
+                        <th v-if="canViewCost" class="px-3 py-2 font-medium">
+                            Unit cost
                         </th>
-                        <th class="px-4 py-3 font-medium">Suggested</th>
-                        <th class="px-4 py-3 font-medium">List</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr
-                        v-for="product in products.data"
-                        :key="product.id"
-                        class="border-t hover:bg-muted/30"
+                        v-for="item in products.data"
+                        :key="item.id"
+                        class="border-b hover:bg-muted/30"
                     >
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2">
                             <Link
-                                :href="show(product.id)"
-                                class="font-medium hover:underline"
+                                class="font-medium text-primary underline-offset-2 hover:underline"
+                                :href="show(item.id)"
                             >
-                                {{ product.name }}
+                                {{ item.display_name }}
                             </Link>
-                            <div class="text-xs text-muted-foreground">
-                                {{ product.category?.name ?? 'Uncategorized' }}
-                            </div>
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
-                            {{ product.sku }}
+                        <td class="px-3 py-2">{{ item.product?.sku }}</td>
+                        <td class="px-3 py-2 capitalize">
+                            {{ item.product?.product_family }}
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
-                            {{ product.vendor?.name ?? '—' }}
+                        <td class="px-3 py-2">
+                            {{ item.is_available ? 'Yes' : 'No' }}
                         </td>
-                        <td
-                            v-if="canViewCost"
-                            class="px-4 py-3 text-muted-foreground"
-                        >
-                            ${{ product.true_cost }}
+                        <td class="px-3 py-2">
+                            {{ item.product?.unit_of_measure }}
                         </td>
-                        <td
-                            v-if="canViewCost"
-                            class="px-4 py-3 text-muted-foreground"
-                        >
-                            {{ product.markup_percent }}%
+                        <td class="px-3 py-2">
+                            {{ item.unit_selling_price ?? '—' }}
                         </td>
-                        <td class="px-4 py-3 font-medium">
-                            ${{ product.suggested_sell_price }}
+                        <td class="px-3 py-2">
+                            {{ item.lead_time_days ?? '—' }}
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
-                            {{
-                                product.list_price
-                                    ? `$${product.list_price}`
-                                    : '—'
-                            }}
+                        <td v-if="canViewCost" class="px-3 py-2">
+                            {{ item.pricing_method }}
+                        </td>
+                        <td v-if="canViewCost" class="px-3 py-2">
+                            {{ item.unit_cost ?? '—' }}
                         </td>
                     </tr>
                     <tr v-if="products.data.length === 0">
                         <td
-                            :colspan="canViewCost ? 7 : 5"
-                            class="px-4 py-8 text-center text-muted-foreground"
+                            class="px-3 py-8 text-center text-muted-foreground"
+                            :colspan="canViewCost ? 9 : 7"
                         >
-                            No products yet.
+                            No organization products yet.
                         </td>
                     </tr>
                 </tbody>

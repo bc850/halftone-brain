@@ -6,10 +6,9 @@ use App\Models\Company;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
+use App\Models\OrganizationProduct;
 use App\Models\ParentAccount;
 use App\Models\ParentAccountMembership;
-use App\Models\Permission;
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Tenancy\PermissionResolver;
@@ -49,22 +48,19 @@ test('same user has different permissions in two organizations', function () {
 test('organization admin cannot mutate shared parent catalog without parent permission', function () {
     $fixture = createTenantUser('admin');
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $fixture['parent']->id,
+        'organization_id' => $fixture['organization']->id,
     ]);
+    $product = $op->product;
 
     $this->actingAs($fixture['user'])
-        ->put(route('org.products.update', [$fixture['organization'], $product]), [
+        ->patch(route('org.products.update-master', [$fixture['organization'], $op]), [
             'name' => 'Updated',
             'sku' => $product->sku,
+            'product_family' => $product->product_family->value,
             'unit_of_measure' => $product->unit_of_measure->value,
-            'true_cost' => '10.00',
-            'markup_percent' => '20',
-            'list_price' => '15.00',
             'is_active' => true,
-            'vendor_id' => null,
-            'product_category_id' => null,
-            'related_product_ids' => [],
         ])
         ->assertForbidden();
 });
@@ -72,27 +68,21 @@ test('organization admin cannot mutate shared parent catalog without parent perm
 test('parent admin can mutate shared master data but has no automatic organization deal permission', function () {
     $fixture = createTenantUser('production_worker', 'parent_admin');
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $fixture['parent']->id,
+        'organization_id' => $fixture['organization']->id,
     ]);
-
-    // Parent admin alone still needs org catalog mutation permission for ProductPolicy under tenant.
-    // Grant org catalog update via override allow, keep deal.create denied by role.
-    attachOrgOverride($fixture['membership'], 'catalog.product.update', PermissionEffect::Allow);
-    attachOrgOverride($fixture['membership'], 'catalog.product.view', PermissionEffect::Allow);
+    $product = $op->product;
 
     $this->actingAs($fixture['user'])
-        ->put(route('org.products.update', [$fixture['organization'], $product]), [
+        ->patch(route('org.products.update-master', [$fixture['organization'], $op]), [
             'name' => 'Parent Updated',
             'sku' => $product->sku,
+            'product_family' => $product->product_family->value,
             'unit_of_measure' => $product->unit_of_measure->value,
-            'true_cost' => '10.00',
-            'markup_percent' => '20',
-            'list_price' => '15.00',
             'is_active' => true,
             'vendor_id' => null,
             'product_category_id' => null,
-            'related_product_ids' => [],
             'description' => null,
             'vendor_sku' => null,
             'notes' => null,
@@ -123,16 +113,18 @@ test('view_all applies only within the current organization and does not imply c
         ->get(route('org.companies.show', [$fixture['organization'], $companyOwnedByOther]))
         ->assertOk();
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $fixture['parent']->id,
-        'true_cost_micro_units' => 1_000_000,
+        'organization_id' => $fixture['organization']->id,
+        'material_cost_micro_units' => 1_000_000,
+        'markup_basis_points' => 5000,
     ]);
 
     $this->actingAs($fixture['user'])
-        ->get(route('org.products.show', [$fixture['organization'], $product]))
+        ->get(route('org.products.show', [$fixture['organization'], $op]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->missing('product.true_cost')
+            ->missing('product.material_cost')
             ->missing('product.markup_percent'));
 });
 

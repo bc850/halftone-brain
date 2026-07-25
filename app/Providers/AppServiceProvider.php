@@ -7,6 +7,7 @@ use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
+use App\Models\OrganizationProduct;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Team;
@@ -160,6 +161,20 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return Product::query()->whereKey($value)->firstOrFail();
+        });
+
+        Route::bind('organizationProduct', function (string $value): OrganizationProduct {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            $tenant = TenantContext::get();
+
+            return OrganizationProduct::query()
+                ->whereKey($value)
+                ->where('organization_id', $tenant->organizationId)
+                ->where('parent_account_id', $tenant->parentAccountId)
+                ->firstOrFail();
         });
 
         Route::bind('vendor', function (string $value): Vendor {

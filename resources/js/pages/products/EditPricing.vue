@@ -9,47 +9,56 @@ import { Label } from '@/components/ui/label';
 import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
 import {
-    index as orgIndex,
     pricingPreview as orgPricingPreview,
-    store as orgStore,
+    show as orgShow,
+    updatePricing,
 } from '@/routes/org/products';
-import {
-    create as legacyCreate,
-    index as legacyIndex,
-    store as legacyStore,
-} from '@/routes/products';
+import { index as legacyIndex, show as legacyShow } from '@/routes/products';
 import type { Tenant } from '@/types';
 
-const index = useTenantRoute(legacyIndex, orgIndex);
-const store = useTenantRoute(legacyStore, orgStore);
+const show = useTenantRoute(legacyShow, orgShow);
 
-type Option = { id: number; name: string };
 type SelectOption = { value: string; label: string };
 
-defineProps<{
-    vendors: Option[];
-    categories: Option[];
-    units: SelectOption[];
-    families: SelectOption[];
+type OrganizationProduct = {
+    id: number;
+    display_name: string;
+    pricing_version: number;
+    material_cost?: string;
+    labor_cost?: string;
+    overhead_mode?: string;
+    overhead_amount?: string;
+    overhead_rate_percent?: string;
+    pricing_method?: string;
+    markup_percent?: string;
+    target_margin_percent?: string;
+    fixed_price?: string | null;
+    minimum_price?: string | null;
+    allow_price_override?: boolean;
+};
+
+const props = defineProps<{
+    product: OrganizationProduct;
     overheadModes: SelectOption[];
     pricingMethods: SelectOption[];
 }>();
 
+const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
+    ?.slug;
+
 const fieldClass =
     'border-input bg-transparent dark:bg-input/30 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none';
-const textareaClass =
-    'border-input bg-transparent dark:bg-input/30 min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none';
 
-const materialCost = ref('40');
-const laborCost = ref('30');
-const overheadMode = ref('fixed');
-const overheadAmount = ref('10');
-const overheadRatePercent = ref('0');
-const pricingMethod = ref('markup');
-const markupPercent = ref('50');
-const targetMarginPercent = ref('0');
-const fixedPrice = ref('');
-const minimumPrice = ref('');
+const materialCost = ref(props.product.material_cost ?? '0');
+const laborCost = ref(props.product.labor_cost ?? '0');
+const overheadMode = ref(props.product.overhead_mode ?? 'none');
+const overheadAmount = ref(props.product.overhead_amount ?? '');
+const overheadRatePercent = ref(props.product.overhead_rate_percent ?? '');
+const pricingMethod = ref(props.product.pricing_method ?? 'markup');
+const markupPercent = ref(props.product.markup_percent ?? '');
+const targetMarginPercent = ref(props.product.target_margin_percent ?? '');
+const fixedPrice = ref(props.product.fixed_price ?? '');
+const minimumPrice = ref(props.product.minimum_price ?? '');
 const preview = ref<{
     unit_cost: string;
     unit_selling_price: string;
@@ -57,9 +66,6 @@ const preview = ref<{
     warnings: string[];
 } | null>(null);
 const previewError = ref<string | null>(null);
-
-const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
-    ?.slug;
 
 function csrfToken(): string {
     return (
@@ -159,182 +165,32 @@ defineOptions({
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
             { title: 'Products', href: legacyIndex() },
-            { title: 'New', href: legacyCreate() },
+            { title: 'Edit pricing', href: legacyIndex() },
         ],
     },
 });
 </script>
 
 <template>
-    <Head title="New organization product" />
+    <Head :title="`Edit pricing · ${product.display_name}`" />
 
     <div class="flex flex-col gap-6 p-4">
         <Heading
-            title="New product for this organization"
-            description="Creates a shared product master and organization pricing in one step"
+            title="Edit organization pricing"
+            :description="product.display_name"
         />
 
         <Form
-            v-bind="store.form()"
+            v-if="slug"
+            v-bind="updatePricing.form([slug, product.id])"
             class="mx-auto grid w-full max-w-3xl gap-8"
             v-slot="{ errors, processing }"
         >
-            <section class="grid gap-4">
-                <h2 class="text-lg font-semibold">
-                    Shared product information
-                </h2>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label for="name">Name</Label>
-                        <Input id="name" name="name" required />
-                        <InputError :message="errors.name" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="sku">SKU</Label>
-                        <Input id="sku" name="sku" required />
-                        <InputError :message="errors.sku" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="product_family">Product family</Label>
-                        <select
-                            id="product_family"
-                            name="product_family"
-                            :class="fieldClass"
-                            required
-                        >
-                            <option
-                                v-for="family in families"
-                                :key="family.value"
-                                :value="family.value"
-                            >
-                                {{ family.label }}
-                            </option>
-                        </select>
-                        <InputError :message="errors.product_family" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="unit_of_measure">Unit of measure</Label>
-                        <select
-                            id="unit_of_measure"
-                            name="unit_of_measure"
-                            :class="fieldClass"
-                            required
-                        >
-                            <option
-                                v-for="unit in units"
-                                :key="unit.value"
-                                :value="unit.value"
-                            >
-                                {{ unit.label }}
-                            </option>
-                        </select>
-                        <InputError :message="errors.unit_of_measure" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="vendor_id">Vendor</Label>
-                        <select
-                            id="vendor_id"
-                            name="vendor_id"
-                            :class="fieldClass"
-                        >
-                            <option value="">None</option>
-                            <option
-                                v-for="vendor in vendors"
-                                :key="vendor.id"
-                                :value="vendor.id"
-                            >
-                                {{ vendor.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="product_category_id">Category</Label>
-                        <select
-                            id="product_category_id"
-                            name="product_category_id"
-                            :class="fieldClass"
-                        >
-                            <option value="">None</option>
-                            <option
-                                v-for="category in categories"
-                                :key="category.id"
-                                :value="category.id"
-                            >
-                                {{ category.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="vendor_sku">Vendor SKU</Label>
-                        <Input id="vendor_sku" name="vendor_sku" />
-                    </div>
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label for="description">Description</Label>
-                        <textarea
-                            id="description"
-                            name="description"
-                            :class="textareaClass"
-                        />
-                    </div>
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label for="notes">Shared notes</Label>
-                        <textarea
-                            id="notes"
-                            name="notes"
-                            :class="textareaClass"
-                        />
-                    </div>
-                    <label class="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            name="is_active"
-                            value="1"
-                            checked
-                        />
-                        Master is active
-                    </label>
-                </div>
-            </section>
-
-            <section class="grid gap-4">
-                <h2 class="text-lg font-semibold">
-                    Organization availability / settings
-                </h2>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="grid gap-2">
-                        <Label for="display_name">Display name override</Label>
-                        <Input id="display_name" name="display_name" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="lead_time_days">Lead time (days)</Label>
-                        <Input
-                            id="lead_time_days"
-                            name="lead_time_days"
-                            type="number"
-                            min="0"
-                        />
-                    </div>
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label for="organization_notes"
-                            >Organization notes</Label
-                        >
-                        <textarea
-                            id="organization_notes"
-                            name="organization_notes"
-                            :class="textareaClass"
-                        />
-                    </div>
-                    <label class="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            name="is_available"
-                            value="1"
-                            checked
-                        />
-                        Available in this organization
-                    </label>
-                </div>
-            </section>
+            <input
+                type="hidden"
+                name="pricing_version"
+                :value="product.pricing_version"
+            />
 
             <section class="grid gap-4">
                 <h2 class="text-lg font-semibold">Cost breakdown</h2>
@@ -460,6 +316,7 @@ defineOptions({
                             type="checkbox"
                             name="allow_price_override"
                             value="1"
+                            :checked="product.allow_price_override"
                         />
                         Allow price override on quotes
                     </label>
@@ -495,11 +352,11 @@ defineOptions({
             </section>
 
             <div class="flex gap-3">
-                <Button type="submit" :disabled="processing"
-                    >Save product</Button
-                >
+                <Button type="submit" :disabled="processing">
+                    Save pricing
+                </Button>
                 <Button variant="outline" as-child>
-                    <Link :href="index()">Cancel</Link>
+                    <Link :href="show(product.id)">Cancel</Link>
                 </Button>
             </div>
         </Form>

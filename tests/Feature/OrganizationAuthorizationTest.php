@@ -3,7 +3,7 @@
 use App\Enums\PermissionEffect;
 use App\Models\Company;
 use App\Models\OrganizationCompany;
-use App\Models\Product;
+use App\Models\OrganizationProduct;
 
 test('organization admin can view companies but cannot update shared identity without parent permission', function () {
     $fixture = createTenantUser('admin');
@@ -31,25 +31,24 @@ test('organization admin can view companies but cannot update shared identity wi
         ->assertForbidden();
 });
 
-test('parent catalog manager with org admin can update products', function () {
+test('parent catalog manager with org admin can update product masters', function () {
     $fixture = createTenantUser('admin', 'parent_catalog_manager');
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $fixture['parent']->id,
+        'organization_id' => $fixture['organization']->id,
     ]);
+    $product = $op->product;
 
     $this->actingAs($fixture['user'])
-        ->put(route('org.products.update', [$fixture['organization'], $product]), [
+        ->patch(route('org.products.update-master', [$fixture['organization'], $op]), [
             'name' => 'Catalog Updated',
             'sku' => $product->sku,
+            'product_family' => $product->product_family->value,
             'unit_of_measure' => $product->unit_of_measure->value,
-            'true_cost' => '12.00',
-            'markup_percent' => '25',
-            'list_price' => '20.00',
             'is_active' => true,
             'vendor_id' => null,
             'product_category_id' => null,
-            'related_product_ids' => [],
             'description' => null,
             'vendor_sku' => null,
             'notes' => null,
@@ -59,18 +58,21 @@ test('parent catalog manager with org admin can update products', function () {
     expect($product->fresh()->name)->toBe('Catalog Updated');
 });
 
-test('product resources omit true cost without permission under tenant', function () {
+test('product resources omit cost without permission under tenant', function () {
     $fixture = createTenantUser('salesperson');
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $fixture['parent']->id,
+        'organization_id' => $fixture['organization']->id,
+        'material_cost_micro_units' => 400_000,
+        'markup_basis_points' => 5000,
     ]);
 
     $this->actingAs($fixture['user'])
-        ->get(route('org.products.show', [$fixture['organization'], $product]))
+        ->get(route('org.products.show', [$fixture['organization'], $op]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->missing('product.true_cost')
+            ->missing('product.material_cost')
             ->missing('product.markup_percent'));
 });
 
@@ -78,12 +80,14 @@ test('explicit allow for view_cost exposes cost fields', function () {
     $fixture = createTenantUser('salesperson');
     attachOrgOverride($fixture['membership'], 'catalog.product.view_cost', PermissionEffect::Allow);
 
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $fixture['parent']->id,
+        'organization_id' => $fixture['organization']->id,
+        'material_cost_micro_units' => 400_000,
     ]);
 
     $this->actingAs($fixture['user'])
-        ->get(route('org.products.show', [$fixture['organization'], $product]))
+        ->get(route('org.products.show', [$fixture['organization'], $op]))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('product.true_cost'));
+        ->assertInertia(fn ($page) => $page->has('product.material_cost'));
 });

@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\OrganizationProduct;
+use App\Models\Product;
 use App\Models\User;
 use App\Support\Tenancy\ActiveOrganizationResolver;
 use Closure;
@@ -78,6 +80,28 @@ class EnforceLegacyTenantBoundary
         $parameters = $route->parameters();
         unset($parameters['organization']);
         $parameters['organization'] = $organization;
+
+        // Org catalog show/edit now bind OrganizationProduct, not Product Master.
+        if (in_array($legacyName, ['products.show', 'products.edit'], true) && isset($parameters['product'])) {
+            $product = $parameters['product'];
+            $productId = $product instanceof Product ? $product->id : (int) $product;
+
+            $organizationProduct = OrganizationProduct::query()
+                ->where('organization_id', $organization->id)
+                ->where('product_id', $productId)
+                ->first();
+
+            if ($organizationProduct === null) {
+                abort(404);
+            }
+
+            unset($parameters['product']);
+            $parameters['organizationProduct'] = $organizationProduct;
+
+            if ($legacyName === 'products.edit') {
+                $orgName = 'org.products.edit-settings';
+            }
+        }
 
         $url = route($orgName, $parameters);
         $parts = parse_url($url);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Company;
+use App\Models\OrganizationProduct;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -25,12 +26,17 @@ test('legacy product show redirects and tenant context is cleared afterwards', f
     $product = Product::factory()->create([
         'parent_account_id' => $ctx['parent']->id,
     ]);
+    $organizationProduct = OrganizationProduct::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+        'organization_id' => $ctx['organization']->id,
+        'product_id' => $product->id,
+    ]);
 
     $this->actingAs($ctx['user'])
         ->get(route('products.show', $product))
         ->assertRedirect(route('org.products.show', [
             'organization' => $ctx['organization'],
-            'product' => $product,
+            'organizationProduct' => $organizationProduct,
         ]));
 
     expect(TenantContext::has())->toBeFalse();

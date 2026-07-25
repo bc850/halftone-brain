@@ -1,12 +1,16 @@
 <?php
 
+use App\Enums\OverheadMode;
+use App\Enums\PricingMethod;
+use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
+use App\Models\OrganizationProduct;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Vendor;
 use App\Support\Money;
 
-test('admins can create products with suggested sell from cost and markup', function () {
+test('owners can create organization products with calculated selling price', function () {
     $ctx = createTenantUser('owner', 'parent_owner');
     $vendor = Vendor::factory()->create([
         'parent_account_id' => $ctx['parent']->id,
@@ -19,52 +23,37 @@ test('admins can create products with suggested sell from cost and markup', func
         ->post(route('org.products.store', $ctx['organization']), [
             'name' => '48x96 ACM Sign 3MM',
             'sku' => 'ACM-4896-3',
+            'product_family' => ProductFamily::Signage->value,
             'vendor_sku' => 'VEN-ACM-1',
             'vendor_id' => $vendor->id,
             'product_category_id' => $category->id,
             'unit_of_measure' => UnitOfMeasure::Each->value,
-            'true_cost' => 100,
-            'markup_percent' => 50,
             'is_active' => true,
+            'is_available' => true,
+            'material_cost' => '40',
+            'labor_cost' => '30',
+            'overhead_mode' => OverheadMode::Fixed->value,
+            'overhead_amount' => '10',
+            'pricing_method' => PricingMethod::Markup->value,
+            'markup_percent' => '50',
         ])
         ->assertRedirect();
 
     $product = Product::query()->where('sku', 'ACM-4896-3')->first();
+    $op = OrganizationProduct::query()->where('product_id', $product->id)->first();
 
     expect($product)->not->toBeNull()
-        ->and($product->list_price_cents)->toBe(15000)
-        ->and(Money::centsToDollars($product->list_price_cents))->toBe('150.00')
-        ->and($product->true_cost_micro_units)->toBe(1_000_000)
-        ->and($product->markup_basis_points)->toBe(5000);
+        ->and($op)->not->toBeNull()
+        ->and($op->material_cost_micro_units)->toBe(Money::dollarsToMicroUnits('40'))
+        ->and($op->markup_basis_points)->toBe(5000)
+        ->and($product->true_cost_micro_units)->toBe(0);
 });
 
-test('related products can be linked', function () {
-    $ctx = createTenantUser('owner', 'parent_owner');
-    $related = Product::factory()->create([
-        'parent_account_id' => $ctx['parent']->id,
-    ]);
-
-    $this->actingAs($ctx['user'])
-        ->post(route('org.products.store', $ctx['organization']), [
-            'name' => 'Vinyl Graphics Kit',
-            'sku' => 'VINYL-KIT-1',
-            'unit_of_measure' => UnitOfMeasure::Set->value,
-            'true_cost' => 40,
-            'markup_percent' => 25,
-            'related_product_ids' => [$related->id],
-        ])
-        ->assertRedirect();
-
-    $product = Product::query()->where('sku', 'VINYL-KIT-1')->first();
-
-    expect($product->relatedProducts)->toHaveCount(1)
-        ->and($product->relatedProducts->first()->id)->toBe($related->id);
-});
-
-test('salesmen can view products but cannot create them', function () {
+test('salesmen can view organization products but cannot create them', function () {
     $ctx = createTenantUser('salesperson');
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $ctx['parent']->id,
+        'organization_id' => $ctx['organization']->id,
     ]);
 
     $this->actingAs($ctx['user'])
@@ -72,38 +61,46 @@ test('salesmen can view products but cannot create them', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('products/Index')
-            ->where('canViewCost', false));
+            ->where('canViewCost', false)
+            ->where('canCreate', false));
 
     $this->actingAs($ctx['user'])
-        ->get(route('org.products.show', [$ctx['organization'], $product]))
+        ->get(route('org.products.show', [$ctx['organization'], $op]))
         ->assertOk();
 
     $this->actingAs($ctx['user'])
         ->post(route('org.products.store', $ctx['organization']), [
             'name' => 'Nope',
             'sku' => 'NOPE-1',
+            'product_family' => ProductFamily::Other->value,
             'unit_of_measure' => UnitOfMeasure::Each->value,
-            'true_cost' => 10,
-            'markup_percent' => 10,
+            'material_cost' => '10',
+            'labor_cost' => '0',
+            'overhead_mode' => OverheadMode::None->value,
+            'pricing_method' => PricingMethod::Markup->value,
+            'markup_percent' => '10',
         ])
         ->assertForbidden();
 });
 
-test('salesmen cannot see product cost fields', function () {
+test('salesmen cannot see organization product cost fields', function () {
     $ctx = createTenantUser('salesperson');
-    $product = Product::factory()->create([
+    $op = OrganizationProduct::factory()->create([
         'parent_account_id' => $ctx['parent']->id,
+        'organization_id' => $ctx['organization']->id,
+        'material_cost_micro_units' => Money::dollarsToMicroUnits('40'),
+        'labor_cost_micro_units' => Money::dollarsToMicroUnits('30'),
+        'overhead_mode' => OverheadMode::Fixed,
+        'overhead_amount_micro_units' => Money::dollarsToMicroUnits('10'),
+        'pricing_method' => PricingMethod::Markup,
+        'markup_basis_points' => 5000,
     ]);
 
     $this->actingAs($ctx['user'])
-        ->get(route('org.products.show', [$ctx['organization'], $product]))
+        ->get(route('org.products.show', [$ctx['organization'], $op]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('products/Show')
-            ->where('canViewCost', false)
-            ->missing('product.true_cost')
+            ->missing('product.material_cost')
             ->missing('product.markup_percent')
-            ->missing('product.vendor_sku')
-            ->missing('product.notes')
-            ->has('product.suggested_sell_price'));
+            ->where('product.unit_selling_price', '120.00'));
 });

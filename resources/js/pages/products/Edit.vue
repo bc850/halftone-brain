@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as orgShow, update as orgUpdate } from '@/routes/org/products';
+import {
+    show as orgShow,
+    updateMaster as orgUpdate,
+} from '@/routes/org/products';
 import {
     index as legacyIndex,
     show as legacyShow,
