@@ -2,6 +2,8 @@
 
 namespace App\Support\Catalog;
 
+use App\Enums\InventoryTrackingMode;
+use App\Enums\ItemKind;
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
 use App\Models\OrganizationProduct;
@@ -42,6 +44,7 @@ final class OrganizationProductCatalogService
                 'parent_account_id' => $tenant->parentAccountId,
                 'name' => $masterData['name'],
                 'product_family' => $masterData['product_family'],
+                'item_kind' => $masterData['item_kind'] ?? ItemKind::Product->value,
                 'sku' => $masterData['sku'],
                 'vendor_sku' => $masterData['vendor_sku'] ?? null,
                 'vendor_id' => $masterData['vendor_id'] ?? null,
@@ -62,6 +65,12 @@ final class OrganizationProductCatalogService
                 'product_id' => $product->id,
                 'display_name' => $organizationData['display_name'] ?? null,
                 'is_available' => (bool) ($organizationData['is_available'] ?? true),
+                'is_sellable' => (bool) ($organizationData['is_sellable'] ?? true),
+                'is_purchasable' => (bool) ($organizationData['is_purchasable'] ?? false),
+                'inventory_tracking_mode' => $organizationData['inventory_tracking_mode'] ?? InventoryTrackingMode::None->value,
+                'purchase_unit_of_measure' => $organizationData['purchase_unit_of_measure'] ?? null,
+                'stock_unit_of_measure' => $organizationData['stock_unit_of_measure'] ?? null,
+                'usage_unit_of_measure' => $organizationData['usage_unit_of_measure'] ?? null,
                 'lead_time_days' => $organizationData['lead_time_days'] ?? null,
                 'notes' => $organizationData['organization_notes'] ?? null,
                 'material_cost_micro_units' => $organizationData['material_cost_micro_units'],
@@ -150,6 +159,12 @@ final class OrganizationProductCatalogService
                 'product_id' => $product->id,
                 'display_name' => $organizationData['display_name'] ?? null,
                 'is_available' => $pricingComplete ? (bool) ($organizationData['is_available'] ?? true) : false,
+                'is_sellable' => (bool) ($organizationData['is_sellable'] ?? true),
+                'is_purchasable' => (bool) ($organizationData['is_purchasable'] ?? false),
+                'inventory_tracking_mode' => $organizationData['inventory_tracking_mode'] ?? InventoryTrackingMode::None->value,
+                'purchase_unit_of_measure' => $organizationData['purchase_unit_of_measure'] ?? null,
+                'stock_unit_of_measure' => $organizationData['stock_unit_of_measure'] ?? null,
+                'usage_unit_of_measure' => $organizationData['usage_unit_of_measure'] ?? null,
                 'lead_time_days' => $organizationData['lead_time_days'] ?? null,
                 'notes' => $organizationData['organization_notes'] ?? null,
                 'material_cost_micro_units' => $organizationData['material_cost_micro_units'] ?? 0,
@@ -366,6 +381,7 @@ final class OrganizationProductCatalogService
             'sku' => $product->sku,
             'name' => $product->name,
             'product_family' => $product->product_family->value,
+            'item_kind' => $product->item_kind->value,
             'unit_of_measure' => $product->unit_of_measure->value,
             'is_active' => $product->is_active,
             'vendor_id' => $product->vendor_id,

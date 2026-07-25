@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\InventoryTrackingMode;
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
 use App\Models\Organization;
@@ -29,6 +30,12 @@ class OrganizationProductFactory extends Factory
             ])->id,
             'display_name' => null,
             'is_available' => true,
+            'is_sellable' => true,
+            'is_purchasable' => false,
+            'inventory_tracking_mode' => InventoryTrackingMode::None,
+            'purchase_unit_of_measure' => null,
+            'stock_unit_of_measure' => null,
+            'usage_unit_of_measure' => null,
             'lead_time_days' => null,
             'notes' => null,
             'material_cost_micro_units' => 0,

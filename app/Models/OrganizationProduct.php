@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\InventoryTrackingMode;
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
+use App\Enums\UnitOfMeasure;
 use App\Support\Pricing\OrganizationProductPricingMapper;
 use App\Support\Pricing\PricingCalculator;
 use App\Support\Pricing\PricingInput;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -23,6 +26,12 @@ use Illuminate\Support\Carbon;
  * @property int $product_id
  * @property string|null $display_name
  * @property bool $is_available
+ * @property bool $is_sellable
+ * @property bool $is_purchasable
+ * @property InventoryTrackingMode $inventory_tracking_mode
+ * @property UnitOfMeasure|null $purchase_unit_of_measure
+ * @property UnitOfMeasure|null $stock_unit_of_measure
+ * @property UnitOfMeasure|null $usage_unit_of_measure
  * @property int|null $lead_time_days
  * @property string|null $notes
  * @property int $material_cost_micro_units
@@ -47,6 +56,12 @@ use Illuminate\Support\Carbon;
     'product_id',
     'display_name',
     'is_available',
+    'is_sellable',
+    'is_purchasable',
+    'inventory_tracking_mode',
+    'purchase_unit_of_measure',
+    'stock_unit_of_measure',
+    'usage_unit_of_measure',
     'lead_time_days',
     'notes',
     'material_cost_micro_units',
@@ -75,6 +90,12 @@ class OrganizationProduct extends Model
     {
         return [
             'is_available' => 'boolean',
+            'is_sellable' => 'boolean',
+            'is_purchasable' => 'boolean',
+            'inventory_tracking_mode' => InventoryTrackingMode::class,
+            'purchase_unit_of_measure' => UnitOfMeasure::class,
+            'stock_unit_of_measure' => UnitOfMeasure::class,
+            'usage_unit_of_measure' => UnitOfMeasure::class,
             'lead_time_days' => 'integer',
             'material_cost_micro_units' => 'integer',
             'labor_cost_micro_units' => 'integer',
@@ -113,6 +134,14 @@ class OrganizationProduct extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * @return HasMany<OrganizationProductUnitConversion, $this>
+     */
+    public function unitConversions(): HasMany
+    {
+        return $this->hasMany(OrganizationProductUnitConversion::class);
     }
 
     /**

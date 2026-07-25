@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ItemKind;
 use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
 use Carbon\Carbon;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $parent_account_id
  * @property string $name
  * @property ProductFamily $product_family
+ * @property ItemKind $item_kind
  * @property string $sku
  * @property string|null $vendor_sku
  * @property int|null $vendor_id
@@ -37,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'parent_account_id',
     'name',
     'product_family',
+    'item_kind',
     'sku',
     'vendor_sku',
     'vendor_id',
@@ -61,6 +64,7 @@ class Product extends Model
     {
         return [
             'product_family' => ProductFamily::class,
+            'item_kind' => ItemKind::class,
             'unit_of_measure' => UnitOfMeasure::class,
             'true_cost_micro_units' => 'integer',
             'markup_basis_points' => 'integer',

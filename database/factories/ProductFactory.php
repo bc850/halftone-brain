@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ItemKind;
 use App\Enums\ProductFamily;
 use App\Enums\UnitOfMeasure;
 use App\Models\ParentAccount;
@@ -27,12 +28,20 @@ class ProductFactory extends Factory
             'parent_account_id' => ParentAccount::factory(),
             'name' => fake()->sentence(3).' Sign',
             'product_family' => ProductFamily::Other,
+            'item_kind' => ItemKind::Product,
             'sku' => strtoupper(fake()->unique()->bothify('SKU-####??')),
             'vendor_sku' => fake()->optional()->bothify('VEN-####'),
             // Optional relationships remain nullable; set explicitly when needed so parent matches.
             'vendor_id' => null,
             'product_category_id' => null,
-            'unit_of_measure' => fake()->randomElement(UnitOfMeasure::cases()),
+            'unit_of_measure' => fake()->randomElement([
+                UnitOfMeasure::Each,
+                UnitOfMeasure::Sheet,
+                UnitOfMeasure::SquareFoot,
+                UnitOfMeasure::LinearFoot,
+                UnitOfMeasure::Hour,
+                UnitOfMeasure::Set,
+            ]),
             'true_cost_micro_units' => $trueCostMicroUnits,
             'markup_basis_points' => $markupBasisPoints,
             'list_price_cents' => $listPriceCents,
@@ -46,6 +55,22 @@ class ProductFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'is_active' => false,
+        ]);
+    }
+
+    public function material(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'item_kind' => ItemKind::Material,
+        ]);
+    }
+
+    public function service(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'item_kind' => ItemKind::Service,
+            'product_family' => ProductFamily::Service,
+            'unit_of_measure' => UnitOfMeasure::Hour,
         ]);
     }
 }

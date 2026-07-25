@@ -357,8 +357,8 @@ test('phase 0e migrations roll back and remigrate cleanly', function () {
     $beforeCompaniesNullable = phase0eColumnIsNullable('companies', 'parent_account_id');
     expect($beforeCompaniesNullable)->toBeFalse();
 
-    // Roll back Phase 1A (2) + 0F drop + three 0E hardening migrations.
-    Artisan::call('migrate:rollback', ['--step' => 6, '--force' => true]);
+    // Roll back Phase 1C.4 (3) + Phase 1A (2) + 0F drop + three 0E hardening migrations.
+    Artisan::call('migrate:rollback', ['--step' => 9, '--force' => true]);
 
     expect(phase0eColumnIsNullable('companies', 'parent_account_id'))->toBeTrue()
         ->and(phase0eHasForeign('organization_companies', 'oc_pa_org_fk', ['parent_account_id', 'organization_id'], 'organizations'))->toBeFalse()
