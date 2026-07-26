@@ -10,6 +10,7 @@ use App\Http\Resources\VendorResource;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\VendorProductOffering;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantRoute;
 use Illuminate\Http\RedirectResponse;
@@ -89,9 +90,21 @@ class VendorController extends Controller
 
         $vendor->load(['products' => fn ($query) => $query->with(['vendor:id,name', 'category:id,name'])->orderBy('name')->limit(50)]);
 
+        $tenant = $this->requireTenantContext();
+
         return Inertia::render('vendors/Show', [
             'vendor' => VendorResource::make($vendor, $user),
+            'vendorOfferings' => VendorProductOfferingController::filteredOfferingsForVendor(
+                request(),
+                $tenant->parentAccountId,
+                $vendor->id,
+            ),
+            'offeringFilters' => [
+                'offering_search' => request()->string('offering_search')->toString(),
+                'offering_status' => request()->string('offering_status')->toString(),
+            ],
             'canManage' => $user->can('update', $vendor),
+            'canManageOfferings' => $user->can('create', VendorProductOffering::class),
             'canViewDetails' => $user->can('viewDetails', $vendor),
         ]);
     }

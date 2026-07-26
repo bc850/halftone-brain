@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Team;
 use App\Models\Vendor;
+use App\Models\VendorProductOffering;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -210,6 +211,30 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return Vendor::query()->whereKey($value)->firstOrFail();
+        });
+
+        Route::bind('vendorProductOffering', function (string $value, \Illuminate\Routing\Route $route): VendorProductOffering {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            $tenant = TenantContext::get();
+
+            $query = VendorProductOffering::query()
+                ->whereKey($value)
+                ->where('parent_account_id', $tenant->parentAccountId);
+
+            $organizationProduct = $route->parameter('organizationProduct');
+            if ($organizationProduct instanceof OrganizationProduct) {
+                $query->where('product_id', $organizationProduct->product_id);
+            }
+
+            $vendor = $route->parameter('vendor');
+            if ($vendor instanceof Vendor) {
+                $query->where('vendor_id', $vendor->id);
+            }
+
+            return $query->firstOrFail();
         });
 
         Route::bind('category', function (string $value): ProductCategory {

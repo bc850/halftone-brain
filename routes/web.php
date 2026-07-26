@@ -7,6 +7,7 @@ use App\Http\Controllers\OrganizationProductController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VendorController;
+use App\Http\Controllers\VendorProductOfferingController;
 use App\Http\Controllers\VisibilityPreferenceController;
 use App\Http\Middleware\EnforceLegacyTenantBoundary;
 use App\Http\Middleware\ResolveTenantContextFromRoute;
@@ -50,6 +51,22 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
         Route::patch('deals/{deal}/stage', [DealController::class, 'updateStage'])->name('deals.stage');
 
         Route::resource('vendors', VendorController::class);
+
+        Route::get('vendors/{vendor}/offerings/create', [VendorProductOfferingController::class, 'createForVendor'])
+            ->name('vendors.offerings.create');
+        Route::post('vendors/{vendor}/offerings', [VendorProductOfferingController::class, 'storeForVendor'])
+            ->name('vendors.offerings.store');
+        Route::get('vendors/{vendor}/offerings/{vendorProductOffering}', [VendorProductOfferingController::class, 'showForVendor'])
+            ->name('vendors.offerings.show');
+        Route::get('vendors/{vendor}/offerings/{vendorProductOffering}/edit', [VendorProductOfferingController::class, 'editForVendor'])
+            ->name('vendors.offerings.edit');
+        Route::patch('vendors/{vendor}/offerings/{vendorProductOffering}', [VendorProductOfferingController::class, 'updateForVendor'])
+            ->name('vendors.offerings.update');
+        Route::post('vendors/{vendor}/offerings/{vendorProductOffering}/discontinue', [VendorProductOfferingController::class, 'discontinueForVendor'])
+            ->name('vendors.offerings.discontinue');
+        Route::post('vendors/{vendor}/offerings/{vendorProductOffering}/reactivate', [VendorProductOfferingController::class, 'reactivateForVendor'])
+            ->name('vendors.offerings.reactivate');
+
         Route::resource('categories', ProductCategoryController::class)
             ->parameters(['categories' => 'category']);
 
@@ -63,6 +80,21 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
         Route::resource('products', OrganizationProductController::class)
             ->parameters(['products' => 'organizationProduct'])
             ->except(['edit', 'update', 'destroy']);
+
+        Route::get('products/{organizationProduct}/offerings/create', [VendorProductOfferingController::class, 'createForProduct'])
+            ->name('products.offerings.create');
+        Route::post('products/{organizationProduct}/offerings', [VendorProductOfferingController::class, 'storeForProduct'])
+            ->name('products.offerings.store');
+        Route::get('products/{organizationProduct}/offerings/{vendorProductOffering}', [VendorProductOfferingController::class, 'showForProduct'])
+            ->name('products.offerings.show');
+        Route::get('products/{organizationProduct}/offerings/{vendorProductOffering}/edit', [VendorProductOfferingController::class, 'editForProduct'])
+            ->name('products.offerings.edit');
+        Route::patch('products/{organizationProduct}/offerings/{vendorProductOffering}', [VendorProductOfferingController::class, 'updateForProduct'])
+            ->name('products.offerings.update');
+        Route::post('products/{organizationProduct}/offerings/{vendorProductOffering}/discontinue', [VendorProductOfferingController::class, 'discontinueForProduct'])
+            ->name('products.offerings.discontinue');
+        Route::post('products/{organizationProduct}/offerings/{vendorProductOffering}/reactivate', [VendorProductOfferingController::class, 'reactivateForProduct'])
+            ->name('products.offerings.reactivate');
 
         Route::get('products/{organizationProduct}/edit-master', [OrganizationProductController::class, 'editMaster'])
             ->name('products.edit-master');

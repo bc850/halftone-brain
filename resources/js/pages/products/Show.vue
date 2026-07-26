@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { dashboard } from '@/routes';
 import {
     archive,
     editMaster,
     editPricing,
     editSettings,
+    show as showProduct,
 } from '@/routes/org/products';
+import {
+    create as createOffering,
+    show as showOffering,
+} from '@/routes/org/products/offerings';
 import { index as legacyIndex } from '@/routes/products';
 import type { Tenant } from '@/types';
 
@@ -99,12 +105,32 @@ type OrganizationProduct = {
     pricing_warnings?: string[];
 };
 
+type VendorOffering = {
+    id: number;
+    vendor_sku: string;
+    manufacturer: string | null;
+    manufacturer_part_number: string | null;
+    purchase_uom_label: string;
+    package_quantity: string;
+    minimum_order_quantity: string | null;
+    lead_time_days: number | null;
+    status: string;
+    status_label: string;
+    vendor: { id: number; name: string } | null;
+};
+
 const props = defineProps<{
     product: OrganizationProduct;
+    vendorOfferings: VendorOffering[];
+    offeringFilters: {
+        offering_search: string;
+        offering_status: string;
+    };
     canUpdateMaster: boolean;
     canUpdateSettings: boolean;
     canManageConversions: boolean;
     canManageComponents: boolean;
+    canManageOfferings: boolean;
     canUpdatePricing: boolean;
     canUpdatePurchaseCost: boolean;
     canArchive: boolean;
@@ -113,6 +139,24 @@ const props = defineProps<{
 
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
     ?.slug;
+
+const offeringSearch = ref(props.offeringFilters.offering_search ?? '');
+const offeringStatus = ref(props.offeringFilters.offering_status ?? '');
+
+function applyOfferingFilters(): void {
+    if (!slug) {
+        return;
+    }
+
+    router.get(
+        showProduct.url([slug, props.product.id]),
+        {
+            offering_search: offeringSearch.value || undefined,
+            offering_status: offeringStatus.value || undefined,
+        },
+        { preserveState: true, replace: true },
+    );
+}
 
 const showsEstimatedMaterials = computed(() => {
     const kind = props.product.product?.item_kind;
@@ -669,6 +713,133 @@ defineOptions({
                 </template>
             </section>
         </div>
+
+        <section class="space-y-3 rounded-xl border p-4">
+            <div
+                class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+            >
+                <div class="space-y-1">
+                    <h2 class="font-medium">Vendor offerings</h2>
+                    <p class="text-sm text-muted-foreground">
+                        The Product Master and internal SKU
+                        <span v-if="product.product">
+                            ({{ product.product.sku }})</span
+                        >
+                        are shared. Vendor offerings identify supplier-specific
+                        listings and are shared across organizations.
+                        Organization pricing and preferred sources are
+                        configured separately later.
+                    </p>
+                </div>
+                <Button
+                    v-if="canManageOfferings && slug"
+                    variant="outline"
+                    as-child
+                >
+                    <Link :href="createOffering.url([slug, product.id])">
+                        Add offering
+                    </Link>
+                </Button>
+            </div>
+
+            <form
+                class="flex flex-col gap-2 sm:flex-row"
+                @submit.prevent="applyOfferingFilters"
+            >
+                <Input
+                    v-model="offeringSearch"
+                    placeholder="Search vendor SKU, manufacturer, vendor…"
+                    class="sm:max-w-sm"
+                />
+                <select
+                    v-model="offeringStatus"
+                    class="h-9 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30"
+                >
+                    <option value="">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="discontinued">Discontinued</option>
+                </select>
+                <Button type="submit" variant="outline">Filter</Button>
+            </form>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-muted-foreground">
+                        <tr class="border-b">
+                            <th class="py-2 pr-3 font-medium">Vendor</th>
+                            <th class="py-2 pr-3 font-medium">Vendor SKU</th>
+                            <th class="py-2 pr-3 font-medium">Manufacturer</th>
+                            <th class="py-2 pr-3 font-medium">UOM / Package</th>
+                            <th class="py-2 pr-3 font-medium">MOQ</th>
+                            <th class="py-2 pr-3 font-medium">Lead time</th>
+                            <th class="py-2 font-medium">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="offering in vendorOfferings"
+                            :key="offering.id"
+                            class="border-b last:border-0"
+                        >
+                            <td class="py-2 pr-3">
+                                <Link
+                                    v-if="slug"
+                                    :href="
+                                        showOffering.url([
+                                            slug,
+                                            product.id,
+                                            offering.id,
+                                        ])
+                                    "
+                                    class="hover:underline"
+                                >
+                                    {{ offering.vendor?.name ?? '—' }}
+                                </Link>
+                                <span v-else>{{
+                                    offering.vendor?.name ?? '—'
+                                }}</span>
+                            </td>
+                            <td class="py-2 pr-3">{{ offering.vendor_sku }}</td>
+                            <td class="py-2 pr-3">
+                                {{ offering.manufacturer ?? '—' }}
+                                <span
+                                    v-if="offering.manufacturer_part_number"
+                                    class="text-muted-foreground"
+                                >
+                                    / {{ offering.manufacturer_part_number }}
+                                </span>
+                            </td>
+                            <td class="py-2 pr-3">
+                                {{ offering.package_quantity }}
+                                {{ offering.purchase_uom_label }}
+                            </td>
+                            <td class="py-2 pr-3">
+                                {{ offering.minimum_order_quantity ?? '—' }}
+                            </td>
+                            <td class="py-2 pr-3">
+                                {{ offering.lead_time_days ?? '—' }}
+                            </td>
+                            <td class="py-2">
+                                <Badge
+                                    :variant="
+                                        offering.status === 'active'
+                                            ? 'secondary'
+                                            : 'destructive'
+                                    "
+                                >
+                                    {{ offering.status_label }}
+                                </Badge>
+                            </td>
+                        </tr>
+                        <tr v-if="vendorOfferings.length === 0">
+                            <td colspan="7" class="py-4 text-muted-foreground">
+                                No vendor offerings yet.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <Button
             v-if="canArchive"

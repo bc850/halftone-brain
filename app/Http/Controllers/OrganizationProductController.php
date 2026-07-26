@@ -33,6 +33,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\VendorProductOffering;
 use App\Support\Catalog\ComponentCost\ComponentCostMapper;
 use App\Support\Catalog\OrganizationProductCatalogService;
 use App\Support\Catalog\OrganizationProductComponentService;
@@ -266,12 +267,24 @@ class OrganizationProductController extends Controller
             'components.componentOrganizationProduct.unitConversions',
         ]);
 
+        $tenant = $this->requireTenantContext();
+
         return Inertia::render('products/Show', [
             'product' => OrganizationProductResource::make($organizationProduct, $user),
+            'vendorOfferings' => VendorProductOfferingController::filteredOfferingsForProduct(
+                request(),
+                $tenant->parentAccountId,
+                $organizationProduct->product_id,
+            ),
+            'offeringFilters' => [
+                'offering_search' => request()->string('offering_search')->toString(),
+                'offering_status' => request()->string('offering_status')->toString(),
+            ],
             'canUpdateMaster' => $user->can('updateMaster', $organizationProduct),
             'canUpdateSettings' => $user->can('updateSettings', $organizationProduct),
             'canManageConversions' => $user->can('updateSettings', $organizationProduct),
             'canManageComponents' => $user->can('manageComponents', $organizationProduct),
+            'canManageOfferings' => $user->can('create', VendorProductOffering::class),
             'canUpdatePricing' => $user->can('updatePricing', $organizationProduct),
             'canUpdatePurchaseCost' => $user->can('updatePurchaseCost', $organizationProduct),
             'canArchive' => $user->can('archive', $organizationProduct),
