@@ -74,8 +74,8 @@ defineOptions({
             <p>Vendor SKU does not replace the internal product SKU.</p>
             <p>Vendor offerings are shared across organizations.</p>
             <p>
-                Organization-specific vendor pricing and preferred sources will
-                be configured separately in a later checkpoint.
+                Organization-specific vendor pricing and preferred sources are
+                configured on each organization’s product page.
             </p>
         </div>
 

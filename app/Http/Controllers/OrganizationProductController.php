@@ -28,6 +28,7 @@ use App\Http\Resources\OrganizationProductResource;
 use App\Models\Organization;
 use App\Models\OrganizationProduct;
 use App\Models\OrganizationProductComponent;
+use App\Models\OrganizationProductSource;
 use App\Models\OrganizationProductUnitConversion;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -285,8 +286,13 @@ class OrganizationProductController extends Controller
             'canManageConversions' => $user->can('updateSettings', $organizationProduct),
             'canManageComponents' => $user->can('manageComponents', $organizationProduct),
             'canManageOfferings' => $user->can('create', VendorProductOffering::class),
+            'vendorSources' => OrganizationProductSourceController::sourcesForProduct($organizationProduct, request()),
+            'canManageSources' => $user->can('attach', [OrganizationProductSource::class, $organizationProduct]),
+            'canManageSourcePricing' => $user->can('updatePricing', $organizationProduct),
+            'canClearPreferredSource' => $user->can('clearPreferred', [OrganizationProductSource::class, $organizationProduct]),
             'canUpdatePricing' => $user->can('updatePricing', $organizationProduct),
-            'canUpdatePurchaseCost' => $user->can('updatePurchaseCost', $organizationProduct),
+            'canUpdatePurchaseCost' => $user->can('updatePurchaseCost', $organizationProduct)
+                && $organizationProduct->preferred_source_id === null,
             'canArchive' => $user->can('archive', $organizationProduct),
             'canViewCost' => $user->can('viewCost', $organizationProduct),
         ]);
@@ -335,7 +341,10 @@ class OrganizationProductController extends Controller
             'inventoryModes' => $this->inventoryModeOptions(),
             'itemKind' => $organizationProduct->product->item_kind->value,
             'canManageConversions' => request()->user()->can('updateSettings', $organizationProduct),
-            'canUpdatePurchaseCost' => request()->user()->can('updatePurchaseCost', $organizationProduct),
+            'canUpdatePurchaseCost' => request()->user()->can('updatePurchaseCost', $organizationProduct)
+                && $organizationProduct->preferred_source_id === null,
+            'hasPreferredSource' => $organizationProduct->preferred_source_id !== null,
+            'preferredSourceId' => $organizationProduct->preferred_source_id,
         ]);
     }
 

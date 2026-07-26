@@ -60,6 +60,7 @@ const props = defineProps<{
     itemKind: string;
     canManageConversions: boolean;
     canUpdatePurchaseCost: boolean;
+    hasPreferredSource?: boolean;
 }>();
 
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
@@ -434,6 +435,22 @@ defineOptions({
                 </Button>
             </div>
         </Form>
+
+        <section
+            v-if="
+                product.is_purchasable &&
+                hasPreferredSource &&
+                !canUpdatePurchaseCost
+            "
+            class="mx-auto grid w-full max-w-3xl gap-2 rounded-xl border border-dashed p-4"
+        >
+            <h2 class="text-lg font-semibold">Purchase cost</h2>
+            <p class="text-sm text-muted-foreground">
+                A preferred vendor source is selected. Update the preferred
+                source package price or clear the preferred source on the
+                product page before editing purchase cost directly.
+            </p>
+        </section>
 
         <section
             v-if="showPurchaseCostSection && slug"

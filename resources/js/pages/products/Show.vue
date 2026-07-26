@@ -17,6 +17,12 @@ import {
     create as createOffering,
     show as showOffering,
 } from '@/routes/org/products/offerings';
+import {
+    clearPreferred,
+    create as createSource,
+    prefer,
+    show as showSource,
+} from '@/routes/org/products/sources';
 import { index as legacyIndex } from '@/routes/products';
 import type { Tenant } from '@/types';
 
@@ -66,6 +72,7 @@ type OrganizationProduct = {
     pricing_method: string;
     pricing_version: number;
     components_version: number;
+    preferred_source_id: number | null;
     material_cost_source: 'manual' | 'components';
     estimate_stale: boolean;
     unit_selling_price: string | null;
@@ -119,9 +126,27 @@ type VendorOffering = {
     vendor: { id: number; name: string } | null;
 };
 
+type VendorSource = {
+    id: number;
+    price_version: number;
+    is_active: boolean;
+    is_preferred: boolean;
+    current_package_price?: string | null;
+    effective_purchase_unit_cost?: string | null;
+    last_price_update_at?: string | null;
+    offering: {
+        vendor_sku: string;
+        vendor_description: string | null;
+        purchase_uom_label: string;
+        package_quantity: string;
+        vendor: { id: number; name: string } | null;
+    } | null;
+};
+
 const props = defineProps<{
     product: OrganizationProduct;
     vendorOfferings: VendorOffering[];
+    vendorSources: VendorSource[];
     offeringFilters: {
         offering_search: string;
         offering_status: string;
@@ -131,6 +156,9 @@ const props = defineProps<{
     canManageConversions: boolean;
     canManageComponents: boolean;
     canManageOfferings: boolean;
+    canManageSources: boolean;
+    canManageSourcePricing: boolean;
+    canClearPreferredSource: boolean;
     canUpdatePricing: boolean;
     canUpdatePurchaseCost: boolean;
     canArchive: boolean;
@@ -727,8 +755,8 @@ defineOptions({
                         >
                         are shared. Vendor offerings identify supplier-specific
                         listings and are shared across organizations.
-                        Organization pricing and preferred sources are
-                        configured separately later.
+                        Organization-specific package prices and preferred
+                        sources are configured in Vendor sources below.
                     </p>
                 </div>
                 <Button
@@ -834,6 +862,172 @@ defineOptions({
                         <tr v-if="vendorOfferings.length === 0">
                             <td colspan="7" class="py-4 text-muted-foreground">
                                 No vendor offerings yet.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="space-y-3 rounded-xl border p-4">
+            <div
+                class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+            >
+                <div class="space-y-1">
+                    <h2 class="font-medium">Vendor sources</h2>
+                    <p class="text-sm text-muted-foreground">
+                        Organization-specific links to shared vendor offerings,
+                        with this organization’s package price and preferred
+                        effective cost. Selecting a preferred source updates
+                        this organization’s effective material cost. It does not
+                        order material or change inventory.
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        v-if="canManageSources && slug"
+                        variant="outline"
+                        as-child
+                    >
+                        <Link :href="createSource.url([slug, product.id])">
+                            Add source
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="
+                            canClearPreferredSource &&
+                            product.preferred_source_id &&
+                            slug
+                        "
+                        variant="secondary"
+                        type="button"
+                        @click="
+                            router.post(clearPreferred.url([slug, product.id]))
+                        "
+                    >
+                        Clear preferred
+                    </Button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-muted-foreground">
+                        <tr class="border-b">
+                            <th class="py-2 pr-3 font-medium">Vendor</th>
+                            <th class="py-2 pr-3 font-medium">Vendor SKU</th>
+                            <th class="py-2 pr-3 font-medium">Package</th>
+                            <th
+                                v-if="canViewCost"
+                                class="py-2 pr-3 font-medium"
+                            >
+                                Package price
+                            </th>
+                            <th
+                                v-if="canViewCost"
+                                class="py-2 pr-3 font-medium"
+                            >
+                                Effective / UOM
+                            </th>
+                            <th class="py-2 pr-3 font-medium">Status</th>
+                            <th class="py-2 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="source in vendorSources"
+                            :key="source.id"
+                            class="border-b last:border-0"
+                        >
+                            <td class="py-2 pr-3">
+                                <Link
+                                    v-if="slug"
+                                    :href="
+                                        showSource.url([
+                                            slug,
+                                            product.id,
+                                            source.id,
+                                        ])
+                                    "
+                                    class="hover:underline"
+                                >
+                                    {{ source.offering?.vendor?.name ?? '—' }}
+                                </Link>
+                            </td>
+                            <td class="py-2 pr-3 font-mono">
+                                {{ source.offering?.vendor_sku ?? '—' }}
+                            </td>
+                            <td class="py-2 pr-3">
+                                {{ source.offering?.package_quantity }}
+                                {{ source.offering?.purchase_uom_label }}
+                            </td>
+                            <td v-if="canViewCost" class="py-2 pr-3">
+                                {{
+                                    source.current_package_price
+                                        ? `$${source.current_package_price}`
+                                        : '—'
+                                }}
+                            </td>
+                            <td v-if="canViewCost" class="py-2 pr-3">
+                                {{
+                                    source.effective_purchase_unit_cost
+                                        ? `$${source.effective_purchase_unit_cost}`
+                                        : '—'
+                                }}
+                            </td>
+                            <td class="py-2 pr-3">
+                                <div class="flex flex-wrap gap-1">
+                                    <Badge
+                                        :variant="
+                                            source.is_active
+                                                ? 'secondary'
+                                                : 'outline'
+                                        "
+                                    >
+                                        {{
+                                            source.is_active
+                                                ? 'Active'
+                                                : 'Inactive'
+                                        }}
+                                    </Badge>
+                                    <Badge
+                                        v-if="source.is_preferred"
+                                        variant="default"
+                                        >Preferred</Badge
+                                    >
+                                </div>
+                            </td>
+                            <td class="py-2">
+                                <Button
+                                    v-if="
+                                        canManageSourcePricing &&
+                                        source.is_active &&
+                                        !source.is_preferred &&
+                                        slug
+                                    "
+                                    size="sm"
+                                    variant="outline"
+                                    type="button"
+                                    @click="
+                                        router.post(
+                                            prefer.url([
+                                                slug,
+                                                product.id,
+                                                source.id,
+                                            ]),
+                                        )
+                                    "
+                                >
+                                    Prefer
+                                </Button>
+                            </td>
+                        </tr>
+                        <tr v-if="vendorSources.length === 0">
+                            <td
+                                :colspan="canViewCost ? 7 : 5"
+                                class="py-4 text-muted-foreground"
+                            >
+                                No organization vendor sources yet.
                             </td>
                         </tr>
                     </tbody>

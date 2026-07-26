@@ -8,6 +8,7 @@ use App\Models\Deal;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
 use App\Models\OrganizationProduct;
+use App\Models\OrganizationProductSource;
 use App\Models\OrganizationProductUnitConversion;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -190,6 +191,24 @@ class AppServiceProvider extends ServiceProvider
             $organizationProduct = $route->parameter('organizationProduct');
 
             return OrganizationProductUnitConversion::query()
+                ->whereKey($value)
+                ->where('organization_product_id', $organizationProduct->id)
+                ->where('organization_id', $tenant->organizationId)
+                ->where('parent_account_id', $tenant->parentAccountId)
+                ->firstOrFail();
+        });
+
+        Route::bind('organizationProductSource', function (string $value, \Illuminate\Routing\Route $route): OrganizationProductSource {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            $tenant = TenantContext::get();
+
+            /** @var OrganizationProduct $organizationProduct */
+            $organizationProduct = $route->parameter('organizationProduct');
+
+            return OrganizationProductSource::query()
                 ->whereKey($value)
                 ->where('organization_product_id', $organizationProduct->id)
                 ->where('organization_id', $tenant->organizationId)

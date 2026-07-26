@@ -375,6 +375,12 @@ final class OrganizationProductCatalogService
                 'is_purchasable' => $locked->is_purchasable,
             ];
 
+            if ($locked->preferred_source_id !== null) {
+                throw ValidationException::withMessages([
+                    'purchase_cost' => 'A preferred vendor source is selected. Update the preferred source package price or clear the preferred source before editing purchase cost directly.',
+                ]);
+            }
+
             $previousCost = $locked->purchase_cost_micro_units;
             $locked->forceFill(['purchase_cost_micro_units' => $purchaseCostMicroUnits])->save();
 

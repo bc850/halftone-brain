@@ -4,6 +4,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
 use App\Http\Controllers\OrganizationProductController;
+use App\Http\Controllers\OrganizationProductSourceController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VendorController;
@@ -95,6 +96,23 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
             ->name('products.offerings.discontinue');
         Route::post('products/{organizationProduct}/offerings/{vendorProductOffering}/reactivate', [VendorProductOfferingController::class, 'reactivateForProduct'])
             ->name('products.offerings.reactivate');
+
+        Route::get('products/{organizationProduct}/sources/create', [OrganizationProductSourceController::class, 'create'])
+            ->name('products.sources.create');
+        Route::post('products/{organizationProduct}/sources', [OrganizationProductSourceController::class, 'store'])
+            ->name('products.sources.store');
+        Route::post('products/{organizationProduct}/sources/clear-preferred', [OrganizationProductSourceController::class, 'clearPreferred'])
+            ->name('products.sources.clear-preferred');
+        Route::get('products/{organizationProduct}/sources/{organizationProductSource}', [OrganizationProductSourceController::class, 'show'])
+            ->name('products.sources.show');
+        Route::patch('products/{organizationProduct}/sources/{organizationProductSource}/price', [OrganizationProductSourceController::class, 'updatePrice'])
+            ->name('products.sources.update-price');
+        Route::post('products/{organizationProduct}/sources/{organizationProductSource}/activate', [OrganizationProductSourceController::class, 'activate'])
+            ->name('products.sources.activate');
+        Route::post('products/{organizationProduct}/sources/{organizationProductSource}/deactivate', [OrganizationProductSourceController::class, 'deactivate'])
+            ->name('products.sources.deactivate');
+        Route::post('products/{organizationProduct}/sources/{organizationProductSource}/prefer', [OrganizationProductSourceController::class, 'selectPreferred'])
+            ->name('products.sources.prefer');
 
         Route::get('products/{organizationProduct}/edit-master', [OrganizationProductController::class, 'editMaster'])
             ->name('products.edit-master');

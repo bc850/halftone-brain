@@ -86,6 +86,7 @@ final class OrganizationProductResource
             'pricing_method' => $organizationProduct->pricing_method->value,
             'pricing_version' => $organizationProduct->pricing_version,
             'components_version' => $organizationProduct->components_version,
+            'preferred_source_id' => $organizationProduct->preferred_source_id,
             'material_cost_source' => $materialCostSource,
             'estimate_stale' => $estimateStale,
             'currency_code' => $organizationProduct->currency_code,

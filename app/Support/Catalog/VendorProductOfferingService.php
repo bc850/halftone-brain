@@ -4,6 +4,8 @@ namespace App\Support\Catalog;
 
 use App\Enums\UnitOfMeasure;
 use App\Enums\VendorProductOfferingStatus;
+use App\Models\OrganizationProduct;
+use App\Models\OrganizationProductSource;
 use App\Models\ParentAccount;
 use App\Models\Product;
 use App\Models\User;
@@ -20,6 +22,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * Parent-scoped vendor offering mutations. Never writes products.vendor_id,
  * organization sources, preferred source, price events, or purchase cost.
+ * Blocks structural edits while active sources exist and discontinuation while
+ * preferred sources still reference the offering.
  */
 final class VendorProductOfferingService
 {
@@ -104,6 +108,17 @@ final class VendorProductOfferingService
             $vendorSku = $this->normalizeVendorSku((string) $data['vendor_sku']);
             $this->assertUniqueVendorSku($tenant, $locked->vendor_id, $vendorSku, $locked->id);
 
+            $newPurchaseUom = UnitOfMeasure::from((string) $data['purchase_uom']);
+            $newPackageQuantityScaled = $this->quantityToScaled((string) $data['package_quantity']);
+            $structuralChange = $locked->purchase_uom !== $newPurchaseUom
+                || $locked->package_quantity_scaled !== $newPackageQuantityScaled;
+
+            if ($structuralChange && $this->hasActiveOrganizationSources($locked->id)) {
+                throw ValidationException::withMessages([
+                    'package_quantity' => 'Package quantity and purchase UOM cannot change while active organization sources use this offering. Create a new offering instead.',
+                ]);
+            }
+
             // Preserve status — editing a discontinued offering must not reactivate it.
             $locked->fill([
                 'vendor_sku' => $vendorSku,
@@ -111,8 +126,8 @@ final class VendorProductOfferingService
                 'manufacturer' => $this->nullableString($data['manufacturer'] ?? null),
                 'manufacturer_part_number' => $this->nullableString($data['manufacturer_part_number'] ?? null),
                 'product_url' => $this->nullableString($data['product_url'] ?? null),
-                'purchase_uom' => UnitOfMeasure::from((string) $data['purchase_uom']),
-                'package_quantity_scaled' => $this->quantityToScaled((string) $data['package_quantity']),
+                'purchase_uom' => $newPurchaseUom,
+                'package_quantity_scaled' => $newPackageQuantityScaled,
                 'minimum_order_quantity_scaled' => $this->optionalQuantityToScaled(
                     array_key_exists('minimum_order_quantity', $data)
                         ? (($data['minimum_order_quantity'] === null || $data['minimum_order_quantity'] === '')
@@ -166,6 +181,12 @@ final class VendorProductOfferingService
             if ($locked->status === VendorProductOfferingStatus::Discontinued) {
                 throw ValidationException::withMessages([
                     'status' => 'This offering is already discontinued.',
+                ]);
+            }
+
+            if ($this->hasPreferredOrganizationSources($locked->id)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Cannot discontinue this offering while it backs a preferred organization source. Clear or replace those preferred sources first.',
                 ]);
             }
 
@@ -340,6 +361,24 @@ final class VendorProductOfferingService
         $trimmed = trim((string) $value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function hasActiveOrganizationSources(int $offeringId): bool
+    {
+        return OrganizationProductSource::query()
+            ->where('vendor_product_offering_id', $offeringId)
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    private function hasPreferredOrganizationSources(int $offeringId): bool
+    {
+        return OrganizationProduct::query()
+            ->whereNotNull('preferred_source_id')
+            ->whereHas('preferredSource', function ($query) use ($offeringId): void {
+                $query->where('vendor_product_offering_id', $offeringId);
+            })
+            ->exists();
     }
 
     private function assertProductVendorUntouched(int $productId, ?int $originalVendorId): void
