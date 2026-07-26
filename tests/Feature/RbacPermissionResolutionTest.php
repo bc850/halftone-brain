@@ -85,7 +85,6 @@ test('parent admin can mutate shared master data but has no automatic organizati
             'is_active' => true,
             'product_category_id' => null,
             'description' => null,
-            'vendor_sku' => null,
             'notes' => null,
         ])
         ->assertRedirect();

@@ -81,7 +81,10 @@ class OrganizationProductController extends Controller
                     ->orWhere('notes', 'like', "%{$search}%")
                     ->orWhereHas('product', function ($productQuery) use ($search): void {
                         $productQuery->where('name', 'like', "%{$search}%")
-                            ->orWhere('sku', 'like', "%{$search}%");
+                            ->orWhere('sku', 'like', "%{$search}%")
+                            ->orWhereHas('vendorProductOfferings', function ($offeringQuery) use ($search): void {
+                                $offeringQuery->where('vendor_sku', 'like', "%{$search}%");
+                            });
                     });
             });
         });
@@ -165,7 +168,6 @@ class OrganizationProductController extends Controller
             'sku' => $data['sku'],
             'product_family' => $data['product_family'],
             'item_kind' => $data['item_kind'],
-            'vendor_sku' => $data['vendor_sku'] ?? null,
             'product_category_id' => $data['product_category_id'] ?? null,
             'unit_of_measure' => $data['unit_of_measure'],
             'description' => $data['description'] ?? null,

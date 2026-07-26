@@ -37,7 +37,6 @@ final class ProductResource
         ];
 
         if ($canViewCost) {
-            $payload['vendor_sku'] = $product->vendor_sku;
             $payload['true_cost'] = Money::microUnitsToDollars($product->true_cost_micro_units);
             $payload['markup_percent'] = Money::basisPointsToPercent($product->markup_basis_points);
             $payload['notes'] = $product->notes;

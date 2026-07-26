@@ -90,7 +90,6 @@ type OrganizationProduct = {
         unit_of_measure: string;
         description: string | null;
         is_active: boolean;
-        vendor_sku?: string | null;
         notes?: string | null;
         category?: { id: number; name: string } | null;
     } | null;

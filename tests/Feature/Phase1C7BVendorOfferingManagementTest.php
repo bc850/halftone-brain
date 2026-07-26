@@ -35,7 +35,6 @@ function phase1c7bSeedGraph(string $orgRole = 'owner', ?string $parentRole = 'pa
         'item_kind' => ItemKind::Material,
         'sku' => 'MAT-ACM-'.uniqid(),
         'name' => 'ACM Sheet',
-        'vendor_sku' => null,
         'unit_of_measure' => UnitOfMeasure::Sheet,
     ]);
     $organizationProduct = OrganizationProduct::factory()->create([

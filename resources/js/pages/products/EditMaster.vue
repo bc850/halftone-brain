@@ -28,7 +28,6 @@ type OrganizationProduct = {
         unit_of_measure: string;
         description: string | null;
         is_active: boolean;
-        vendor_sku?: string | null;
         notes?: string | null;
         category?: { id: number; name: string } | null;
     } | null;
@@ -197,14 +196,10 @@ defineOptions({
                             </option>
                         </select>
                     </div>
-                    <div class="grid gap-2">
-                        <Label for="vendor_sku">Vendor SKU</Label>
-                        <Input
-                            id="vendor_sku"
-                            name="vendor_sku"
-                            :default-value="master?.vendor_sku ?? ''"
-                        />
-                    </div>
+                    <p class="text-sm text-muted-foreground sm:col-span-2">
+                        Add supplier item numbers through Vendor offerings after
+                        creating the Product Master.
+                    </p>
                     <div class="grid gap-2 sm:col-span-2">
                         <Label for="description">Description</Label>
                         <textarea

@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-const PHASE_1C7D_DROP_LEGACY_VENDOR_ID = '2026_07_26_200508_drop_legacy_products_vendor_id_column';
+const PHASE_1C7D_DROP_LEGACY_VENDOR_COLUMNS = '2026_07_26_200508_drop_legacy_products_vendor_columns';
 
 function phase1c7dHasForeign(string $table, string $name, array $columns, string $foreignTable): bool
 {
@@ -89,7 +89,6 @@ function phase1c7dSeedGraph(): array
         'item_kind' => ItemKind::Material,
         'sku' => 'MAT-1C7D-'.uniqid(),
         'name' => 'Legacy Retire Material',
-        'vendor_sku' => null,
         'unit_of_measure' => UnitOfMeasure::Sheet,
     ]);
     $organizationProduct = OrganizationProduct::factory()->create([
@@ -117,18 +116,21 @@ function phase1c7dSeedGraph(): array
     ];
 }
 
-test('fully migrated schema lacks products.vendor_id and product has no vendor relation', function () {
+test('fully migrated schema lacks products vendor_id and vendor_sku and product has no vendor relation', function () {
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
-        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse()
+        ->and(Schema::hasColumn('vendor_product_offerings', 'vendor_sku'))->toBeTrue()
         ->and(Schema::hasTable('vendor_product_offerings'))->toBeTrue()
         ->and(Schema::hasTable('organization_product_sources'))->toBeTrue()
         ->and(method_exists(Product::class, 'vendor'))->toBeFalse()
         ->and(method_exists(Product::class, 'vendorProductOfferings'))->toBeTrue()
         ->and(method_exists(Vendor::class, 'products'))->toBeFalse()
-        ->and(method_exists(Vendor::class, 'vendorProductOfferings'))->toBeTrue();
+        ->and(method_exists(Vendor::class, 'vendorProductOfferings'))->toBeTrue()
+        ->and((new Product)->isFillable('vendor_id'))->toBeFalse()
+        ->and((new Product)->isFillable('vendor_sku'))->toBeFalse();
 });
 
-test('product create and master update strip legacy vendor_id without writing offerings', function () {
+test('product create and master update strip legacy vendor_id and vendor_sku without writing offerings', function () {
     $g = phase1c7dSeedGraph();
 
     $this->actingAs($g['user'])
@@ -156,7 +158,7 @@ test('product create and master update strip legacy vendor_id without writing of
     $created = Product::query()->where('name', 'No Legacy Vendor Product')->firstOrFail();
 
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
-        ->and($created->vendor_sku)->toBe('TEXT-SKU-ONLY')
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse()
         ->and(VendorProductOffering::query()->where('product_id', $created->id)->count())->toBe(0)
         ->and(OrganizationProductSource::query()->count())->toBe(0);
 
@@ -165,7 +167,7 @@ test('product create and master update strip legacy vendor_id without writing of
             'organization' => $g['organization'],
             'organizationProduct' => $g['organizationProduct'],
         ]), [
-            'name' => $g['product']->name,
+            'name' => 'Updated Master Name',
             'sku' => $g['product']->sku,
             'product_family' => $g['product']->product_family->value,
             'item_kind' => $g['product']->item_kind->value,
@@ -176,7 +178,7 @@ test('product create and master update strip legacy vendor_id without writing of
         ])
         ->assertRedirect();
 
-    expect($g['product']->fresh()->vendor_sku)->toBe('UPDATED-SKU')
+    expect($g['product']->fresh()->name)->toBe('Updated Master Name')
         ->and(VendorProductOffering::query()->count())->toBe(0)
         ->and(OrganizationProductSource::query()->count())->toBe(0);
 });
@@ -199,6 +201,7 @@ test('product resources and forms omit legacy vendor fields while offerings and 
         ->assertInertia(fn ($page) => $page
             ->component('products/Show')
             ->missing('product.product.vendor')
+            ->missing('product.product.vendor_sku')
             ->where('vendorOfferings.0.vendor_sku', 'OFFER-1C7D')
             ->where('vendorOfferings.0.vendor.id', $g['vendor']->id));
 
@@ -215,7 +218,8 @@ test('product resources and forms omit legacy vendor fields while offerings and 
         ->assertInertia(fn ($page) => $page
             ->component('products/EditMaster')
             ->missing('vendors')
-            ->missing('product.product.vendor'));
+            ->missing('product.product.vendor')
+            ->missing('product.product.vendor_sku'));
 
     $this->actingAs($g['user'])
         ->get(route('org.vendors.index', $g['organization']))
@@ -231,10 +235,11 @@ test('product resources and forms omit legacy vendor fields while offerings and 
         ->assertInertia(fn ($page) => $page
             ->component('vendors/Show')
             ->missing('vendor.products')
-            ->where('vendorOfferings.0.id', $offering->id));
+            ->where('vendorOfferings.0.id', $offering->id)
+            ->where('vendorOfferings.0.vendor_sku', 'OFFER-1C7D'));
 });
 
-test('offering and source workflows still operate without products.vendor_id', function () {
+test('offering workflows and catalog search use offering vendor_sku without product columns or duplicate rows', function () {
     $g = phase1c7dSeedGraph();
 
     $this->actingAs($g['user'])
@@ -250,7 +255,16 @@ test('offering and source workflows still operate without products.vendor_id', f
         ])
         ->assertRedirect();
 
-    $offering = VendorProductOffering::query()->firstOrFail();
+    VendorProductOffering::factory()->create([
+        'parent_account_id' => $g['parent']->id,
+        'product_id' => $g['product']->id,
+        'vendor_id' => $g['vendor']->id,
+        'vendor_sku' => 'WORKFLOW-ALT',
+        'purchase_uom' => UnitOfMeasure::Sheet,
+        'package_quantity_scaled' => ComponentCostEstimator::QUANTITY_SCALE_FACTOR,
+    ]);
+
+    $offering = VendorProductOffering::query()->where('vendor_sku', 'WORKFLOW-SKU')->firstOrFail();
 
     $this->actingAs($g['user'])
         ->post(route('org.products.sources.store', [
@@ -263,42 +277,57 @@ test('offering and source workflows still operate without products.vendor_id', f
         ])
         ->assertRedirect();
 
+    $this->actingAs($g['user'])
+        ->get(route('org.products.index', [
+            'organization' => $g['organization'],
+            'search' => 'WORKFLOW',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('products/Index')
+            ->has('products.data', 1)
+            ->where('products.data.0.id', $g['organizationProduct']->id));
+
     expect(OrganizationProductSource::query()->count())->toBe(1)
         ->and($g['organizationProduct']->fresh()->purchase_cost_micro_units)
         ->toBe(Money::dollarsToMicroUnits('25.00'))
-        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
+        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse()
+        ->and(Schema::hasColumn('vendor_product_offerings', 'vendor_sku'))->toBeTrue();
 });
 
-test('migrate pretend for pending legacy vendor_id drop succeeds without schema change', function () {
+test('migrate pretend for pending legacy vendor columns drop succeeds without schema change', function () {
     phase1c7dRollbackDrop();
 
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeTrue()
-        ->and(DB::table('migrations')->where('migration', PHASE_1C7D_DROP_LEGACY_VENDOR_ID)->exists())->toBeFalse();
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue()
+        ->and(DB::table('migrations')->where('migration', PHASE_1C7D_DROP_LEGACY_VENDOR_COLUMNS)->exists())->toBeFalse();
 
     $exit = Artisan::call('migrate', ['--pretend' => true]);
     $output = Artisan::output();
 
     expect($exit)->toBe(0)
-        ->and($output)->toContain(PHASE_1C7D_DROP_LEGACY_VENDOR_ID)
-        ->and($output)->toMatch('/drop|vendor_id/i')
+        ->and($output)->toContain(PHASE_1C7D_DROP_LEGACY_VENDOR_COLUMNS)
+        ->and($output)->toMatch('/vendor_id|vendor_sku/i')
         ->and(Schema::hasColumn('products', 'vendor_id'))->toBeTrue()
-        ->and(DB::table('migrations')->where('migration', PHASE_1C7D_DROP_LEGACY_VENDOR_ID)->exists())->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue()
+        ->and(DB::table('migrations')->where('migration', PHASE_1C7D_DROP_LEGACY_VENDOR_COLUMNS)->exists())->toBeFalse()
         ->and(Schema::hasTable('vendor_product_offerings'))->toBeTrue()
         ->and(Schema::hasTable('organization_product_sources'))->toBeTrue();
 
     Artisan::call('migrate', ['--force' => true]);
-    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
+    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
 });
 
 test('clean migration drop succeeds and remigration drops again after rollback', function () {
-    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
+    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
 
     $offeringCount = VendorProductOffering::query()->count();
     $sourceCount = OrganizationProductSource::query()->count();
     $eventCount = OrganizationProductSourcePriceEvent::query()->count();
 
-    // Avoid child rows on SQLite: RefreshDatabase transactions make PRAGMA foreign_keys
-    // ineffective, so rebuilding products during rollback/remigrate would fail.
     $seedProduct = null;
     $purchaseCost = null;
     if (Schema::getConnection()->getDriverName() !== 'sqlite') {
@@ -310,6 +339,7 @@ test('clean migration drop succeeds and remigration drops again after rollback',
     phase1c7dRollbackDrop();
 
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeTrue()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue()
         ->and(phase1c7dHasIndex('products', 'products_vendor_id_index'))->toBeTrue()
         ->and(phase1c7dHasIndex('products', 'products_parent_account_id_vendor_id_index'))->toBeTrue();
 
@@ -328,12 +358,14 @@ test('clean migration drop succeeds and remigration drops again after rollback',
 
     if ($seedProduct !== null) {
         expect(DB::table('products')->where('id', $seedProduct->id)->value('vendor_id'))->toBeNull()
+            ->and(DB::table('products')->where('id', $seedProduct->id)->value('vendor_sku'))->toBeNull()
             ->and($seedProduct->organizationProducts()->first()->purchase_cost_micro_units)->toBe($purchaseCost);
     }
 
     Artisan::call('migrate', ['--force' => true]);
 
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse()
         ->and(phase1c7dHasForeign('products', 'products_vendor_id_foreign', ['vendor_id'], 'vendors'))->toBeFalse()
         ->and(phase1c7dHasForeign('products', 'pr_pa_ve_fk', ['parent_account_id', 'vendor_id'], 'vendors'))->toBeFalse()
         ->and(VendorProductOffering::query()->count())->toBe($offeringCount)
@@ -345,13 +377,14 @@ test('clean migration drop succeeds and remigration drops again after rollback',
     }
 });
 
-test('populated products.vendor_id blocks migration with no partial schema change', function () {
-    phase1c7dRollbackDrop();
-    expect(Schema::hasColumn('products', 'vendor_id'))->toBeTrue();
-
+/**
+ * @return array{parent: ParentAccount, vendor: Vendor, productId: int}
+ */
+function phase1c7dInsertBlockingProduct(array $overrides = []): array
+{
     $parent = ParentAccount::factory()->create();
     $vendor = Vendor::factory()->create(['parent_account_id' => $parent->id]);
-    $productId = DB::table('products')->insertGetId([
+    $productId = (int) DB::table('products')->insertGetId([
         'parent_account_id' => $parent->id,
         'name' => 'Blocking Legacy Product',
         'product_family' => ProductFamily::Other->value,
@@ -360,31 +393,97 @@ test('populated products.vendor_id blocks migration with no partial schema chang
         'unit_of_measure' => UnitOfMeasure::Each->value,
         'true_cost_micro_units' => 0,
         'markup_basis_points' => 0,
-        'vendor_id' => $vendor->id,
+        'vendor_id' => null,
+        'vendor_sku' => null,
         'is_active' => true,
         'created_at' => now(),
         'updated_at' => now(),
+        ...$overrides,
     ]);
 
-    $offeringBefore = VendorProductOffering::query()->count();
-    $sourceBefore = OrganizationProductSource::query()->count();
+    return compact('parent', 'vendor', 'productId');
+}
 
-    expect(fn () => Artisan::call('migrate', ['--force' => true]))
-        ->toThrow(RuntimeException::class, '1 product(s) still reference a vendor');
-
+function phase1c7dAssertBlockedIntact(int $productId, ?int $expectedVendorId, ?string $expectedVendorSku): void
+{
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeTrue()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue()
         ->and(phase1c7dHasIndex('products', 'products_vendor_id_index'))->toBeTrue()
-        ->and((int) DB::table('products')->where('id', $productId)->value('vendor_id'))->toBe($vendor->id)
-        ->and(DB::table('migrations')->where('migration', PHASE_1C7D_DROP_LEGACY_VENDOR_ID)->exists())->toBeFalse()
-        ->and(VendorProductOffering::query()->count())->toBe($offeringBefore)
-        ->and(OrganizationProductSource::query()->count())->toBe($sourceBefore);
+        ->and(DB::table('migrations')->where('migration', PHASE_1C7D_DROP_LEGACY_VENDOR_COLUMNS)->exists())->toBeFalse();
+
+    expect(DB::table('products')->where('id', $productId)->value('vendor_id'))->toBe($expectedVendorId)
+        ->and(DB::table('products')->where('id', $productId)->value('vendor_sku'))->toBe($expectedVendorSku);
 
     if (Schema::getConnection()->getDriverName() === 'mysql') {
         expect(phase1c7dHasForeign('products', 'products_vendor_id_foreign', ['vendor_id'], 'vendors'))->toBeTrue()
             ->and(phase1c7dHasIndex('products', 'products_parent_account_id_vendor_id_index'))->toBeTrue();
     }
+}
 
-    DB::table('products')->where('id', $productId)->update(['vendor_id' => null]);
+test('populated products.vendor_id blocks migration with no partial schema change', function () {
+    phase1c7dRollbackDrop();
+    $block = phase1c7dInsertBlockingProduct(['vendor_id' => null]);
+    DB::table('products')->where('id', $block['productId'])->update(['vendor_id' => $block['vendor']->id]);
+
+    $offeringsBefore = VendorProductOffering::query()->count();
+    $sourcesBefore = OrganizationProductSource::query()->count();
+
+    expect(fn () => Artisan::call('migrate', ['--force' => true]))
+        ->toThrow(RuntimeException::class, '1 product(s) still reference a vendor_id and 0 product(s) still have a vendor_sku');
+
+    phase1c7dAssertBlockedIntact($block['productId'], $block['vendor']->id, null);
+    expect(VendorProductOffering::query()->count())->toBe($offeringsBefore)
+        ->and(OrganizationProductSource::query()->count())->toBe($sourcesBefore);
+
+    DB::table('products')->where('id', $block['productId'])->update(['vendor_id' => null]);
     Artisan::call('migrate', ['--force' => true]);
-    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
+    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
+});
+
+test('populated products.vendor_sku blocks migration with no partial schema change', function () {
+    phase1c7dRollbackDrop();
+    $block = phase1c7dInsertBlockingProduct(['vendor_sku' => 'ONLY-SKU']);
+
+    $offeringsBefore = VendorProductOffering::query()->count();
+    $sourcesBefore = OrganizationProductSource::query()->count();
+
+    expect(fn () => Artisan::call('migrate', ['--force' => true]))
+        ->toThrow(RuntimeException::class, '0 product(s) still reference a vendor_id and 1 product(s) still have a vendor_sku');
+
+    phase1c7dAssertBlockedIntact($block['productId'], null, 'ONLY-SKU');
+    expect(VendorProductOffering::query()->count())->toBe($offeringsBefore)
+        ->and(OrganizationProductSource::query()->count())->toBe($sourcesBefore);
+
+    DB::table('products')->where('id', $block['productId'])->update(['vendor_sku' => null]);
+    Artisan::call('migrate', ['--force' => true]);
+    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
+});
+
+test('populated products.vendor_id and vendor_sku together block migration with no partial schema change', function () {
+    phase1c7dRollbackDrop();
+    $block = phase1c7dInsertBlockingProduct();
+    DB::table('products')->where('id', $block['productId'])->update([
+        'vendor_id' => $block['vendor']->id,
+        'vendor_sku' => 'BOTH-SKU',
+    ]);
+
+    $offeringsBefore = VendorProductOffering::query()->count();
+    $sourcesBefore = OrganizationProductSource::query()->count();
+
+    expect(fn () => Artisan::call('migrate', ['--force' => true]))
+        ->toThrow(RuntimeException::class, '1 product(s) still reference a vendor_id and 1 product(s) still have a vendor_sku');
+
+    phase1c7dAssertBlockedIntact($block['productId'], $block['vendor']->id, 'BOTH-SKU');
+    expect(VendorProductOffering::query()->count())->toBe($offeringsBefore)
+        ->and(OrganizationProductSource::query()->count())->toBe($sourcesBefore);
+
+    DB::table('products')->where('id', $block['productId'])->update([
+        'vendor_id' => null,
+        'vendor_sku' => null,
+    ]);
+    Artisan::call('migrate', ['--force' => true]);
+    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
 });

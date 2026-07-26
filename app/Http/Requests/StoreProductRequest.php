@@ -21,6 +21,7 @@ class StoreProductRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->request->remove('vendor_id');
+        $this->request->remove('vendor_sku');
     }
 
     /**
@@ -31,7 +32,6 @@ class StoreProductRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['required', 'string', 'max:100', 'unique:products,sku'],
-            'vendor_sku' => ['nullable', 'string', 'max:100'],
             'product_category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
             'unit_of_measure' => ['required', Rule::enum(UnitOfMeasure::class)],
             'true_cost' => ['required', 'numeric', 'min:0'],

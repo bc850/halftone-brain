@@ -24,6 +24,7 @@ class UpdateProductMasterRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->request->remove('vendor_id');
+        $this->request->remove('vendor_sku');
     }
 
     /**
@@ -48,7 +49,6 @@ class UpdateProductMasterRequest extends FormRequest
             ],
             'product_family' => ['required', Rule::enum(ProductFamily::class)],
             'item_kind' => ['required', Rule::enum(ItemKind::class)],
-            'vendor_sku' => ['nullable', 'string', 'max:100'],
             'product_category_id' => [
                 'nullable',
                 'integer',

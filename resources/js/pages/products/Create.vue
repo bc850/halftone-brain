@@ -322,10 +322,10 @@ defineOptions({
                             </option>
                         </select>
                     </div>
-                    <div class="grid gap-2">
-                        <Label for="vendor_sku">Vendor SKU</Label>
-                        <Input id="vendor_sku" name="vendor_sku" />
-                    </div>
+                    <p class="text-sm text-muted-foreground sm:col-span-2">
+                        Add supplier item numbers through Vendor offerings after
+                        creating the Product Master.
+                    </p>
                     <div class="grid gap-2 sm:col-span-2">
                         <Label for="description">Description</Label>
                         <textarea

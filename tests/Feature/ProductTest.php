@@ -21,7 +21,6 @@ test('owners can create organization products with calculated selling price', fu
             'sku' => 'ACM-4896-3',
             'product_family' => ProductFamily::Signage->value,
             'item_kind' => 'product',
-            'vendor_sku' => 'VEN-ACM-1',
             'product_category_id' => $category->id,
             'unit_of_measure' => UnitOfMeasure::Each->value,
             'is_active' => true,

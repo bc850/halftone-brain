@@ -93,7 +93,6 @@ function phase1c7aSeedGraph(): array
         'parent_account_id' => $parent->id,
         'item_kind' => ItemKind::Material,
         'sku' => 'MAT-ACM-3MM-48X96-'.uniqid(),
-        'vendor_sku' => null,
     ]);
     $vendor = Vendor::factory()->create([
         'parent_account_id' => $parent->id,
@@ -435,7 +434,8 @@ test('phase 1c7a rollback removes preferred then sources then offerings and remi
 
     expect(Schema::hasTable('organization_product_components'))->toBeTrue()
         ->and(Schema::hasColumn('organization_products', 'purchase_cost_micro_units'))->toBeTrue()
-        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
+        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
 
     phase1c7aRollback();
 
@@ -447,6 +447,7 @@ test('phase 1c7a rollback removes preferred then sources then offerings and remi
         ->and(Schema::hasColumn('organization_products', 'purchase_cost_micro_units'))->toBeTrue()
         ->and(Schema::hasColumn('organization_products', 'components_version'))->toBeTrue()
         ->and(Schema::hasColumn('products', 'vendor_id'))->toBeTrue()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue()
         ->and(DB::table('organization_products')->where('id', $g['organizationProduct']->id)->exists())->toBeTrue();
 
     phase1c7aRemigrate();
@@ -455,7 +456,8 @@ test('phase 1c7a rollback removes preferred then sources then offerings and remi
         ->and(Schema::hasTable('organization_product_sources'))->toBeTrue()
         ->and(Schema::hasColumn('organization_products', 'preferred_source_id'))->toBeTrue()
         ->and(Schema::hasTable('organization_product_source_price_events'))->toBeTrue()
-        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
+        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse();
 });
 
 test('phase 1c7a schema setup does not mutate purchase cost or product master identity', function () {
@@ -463,11 +465,11 @@ test('phase 1c7a schema setup does not mutate purchase cost or product master id
     $product = Product::factory()->create([
         'parent_account_id' => $parent->id,
         'sku' => 'LEGACY-'.uniqid(),
-        'vendor_sku' => null,
     ]);
 
     expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
-        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue();
+        ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeFalse()
+        ->and(Schema::hasColumn('vendor_product_offerings', 'vendor_sku'))->toBeTrue();
 
     $organization = Organization::factory()->create([
         'parent_account_id' => $parent->id,

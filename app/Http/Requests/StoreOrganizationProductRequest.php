@@ -29,6 +29,7 @@ class StoreOrganizationProductRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->request->remove('vendor_id');
+        $this->request->remove('vendor_sku');
 
         if (! $this->filled('item_kind')) {
             return;
@@ -78,7 +79,6 @@ class StoreOrganizationProductRequest extends FormRequest
             ],
             'product_family' => ['required', Rule::enum(ProductFamily::class)],
             'item_kind' => ['required', Rule::enum(ItemKind::class)],
-            'vendor_sku' => ['nullable', 'string', 'max:100'],
             'product_category_id' => [
                 'nullable',
                 'integer',

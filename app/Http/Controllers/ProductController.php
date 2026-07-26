@@ -43,7 +43,9 @@ class ProductController extends Controller
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
                         ->orWhere('sku', 'like', "%{$search}%")
-                        ->orWhere('vendor_sku', 'like', "%{$search}%");
+                        ->orWhereHas('vendorProductOfferings', function ($offeringQuery) use ($search): void {
+                            $offeringQuery->where('vendor_sku', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($request->integer('category_id') ?: null, fn ($query, int $categoryId) => $query->where('product_category_id', $categoryId))

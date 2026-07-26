@@ -29,7 +29,6 @@ type Product = {
     id: number;
     name: string;
     sku: string;
-    vendor_sku: string | null;
     product_category_id: number | null;
     unit_of_measure: string;
     true_cost: string;
@@ -107,14 +106,6 @@ defineOptions({
                     <InputError :message="errors.sku" />
                 </div>
                 <div class="grid gap-2">
-                    <Label for="vendor_sku">Vendor SKU</Label>
-                    <Input
-                        id="vendor_sku"
-                        name="vendor_sku"
-                        :default-value="product.vendor_sku ?? ''"
-                    />
-                </div>
-                <div class="grid gap-2">
                     <Label for="product_category_id">Category</Label>
                     <select
                         id="product_category_id"
@@ -132,6 +123,10 @@ defineOptions({
                         </option>
                     </select>
                 </div>
+                <p class="text-sm text-muted-foreground sm:col-span-2">
+                    Add supplier item numbers through Vendor offerings after
+                    creating the Product Master.
+                </p>
                 <div class="grid gap-2">
                     <Label for="unit_of_measure">Unit of measure</Label>
                     <select

@@ -21,6 +21,7 @@ class UpdateProductRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->request->remove('vendor_id');
+        $this->request->remove('vendor_sku');
     }
 
     /**
@@ -39,7 +40,6 @@ class UpdateProductRequest extends FormRequest
                 'max:100',
                 Rule::unique('products', 'sku')->ignore($product->id),
             ],
-            'vendor_sku' => ['nullable', 'string', 'max:100'],
             'product_category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
             'unit_of_measure' => ['required', Rule::enum(UnitOfMeasure::class)],
             'true_cost' => ['required', 'numeric', 'min:0'],

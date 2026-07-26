@@ -50,7 +50,6 @@ test('parent catalog manager with org admin can update product masters', functio
             'is_active' => true,
             'product_category_id' => null,
             'description' => null,
-            'vendor_sku' => null,
             'notes' => null,
         ])
         ->assertRedirect();

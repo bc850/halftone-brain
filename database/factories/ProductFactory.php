@@ -30,7 +30,6 @@ class ProductFactory extends Factory
             'product_family' => ProductFamily::Other,
             'item_kind' => ItemKind::Product,
             'sku' => strtoupper(fake()->unique()->bothify('SKU-####??')),
-            'vendor_sku' => fake()->optional()->bothify('VEN-####'),
             // Optional category remains nullable; set explicitly when needed so parent matches.
             'product_category_id' => null,
             'unit_of_measure' => fake()->randomElement([

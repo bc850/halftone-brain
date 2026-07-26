@@ -114,7 +114,6 @@ final class OrganizationProductResource
                 'unit_of_measure' => $product->unit_of_measure->value,
                 'description' => $product->description,
                 'is_active' => $product->is_active,
-                'vendor_sku' => $canViewCost ? $product->vendor_sku : null,
                 'notes' => $canViewCost ? $product->notes : null,
                 'category' => $product->relationLoaded('category') && $product->category
                     ? ['id' => $product->category->id, 'name' => $product->category->name]

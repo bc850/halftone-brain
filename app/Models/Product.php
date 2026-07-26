@@ -22,7 +22,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ProductFamily $product_family
  * @property ItemKind $item_kind
  * @property string $sku
- * @property string|null $vendor_sku
  * @property int|null $product_category_id
  * @property UnitOfMeasure $unit_of_measure
  * @property int $true_cost_micro_units
@@ -40,7 +39,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'product_family',
     'item_kind',
     'sku',
-    'vendor_sku',
     'product_category_id',
     'unit_of_measure',
     'true_cost_micro_units',
