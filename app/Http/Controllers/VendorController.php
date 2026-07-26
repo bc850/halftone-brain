@@ -30,7 +30,7 @@ class VendorController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $vendorsQuery = Vendor::query()->withCount('products');
+        $vendorsQuery = Vendor::query()->withCount('vendorProductOfferings');
 
         if (TenantContext::has()) {
             $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
@@ -87,8 +87,6 @@ class VendorController extends Controller
 
         /** @var User $user */
         $user = request()->user();
-
-        $vendor->load(['products' => fn ($query) => $query->with(['vendor:id,name', 'category:id,name'])->orderBy('name')->limit(50)]);
 
         $tenant = $this->requireTenantContext();
 

@@ -29,7 +29,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * 3. vendor_product_offerings
  * 4. dependent finished organization_products (via ComponentDependencyVersionService)
  *
- * Never writes products.vendor_id, inventory, purchase orders, or QuickBooks.
+ * Never writes inventory, purchase orders, or QuickBooks.
  */
 final class OrganizationProductSourceService
 {

@@ -31,8 +31,7 @@ class ProductFactory extends Factory
             'item_kind' => ItemKind::Product,
             'sku' => strtoupper(fake()->unique()->bothify('SKU-####??')),
             'vendor_sku' => fake()->optional()->bothify('VEN-####'),
-            // Optional relationships remain nullable; set explicitly when needed so parent matches.
-            'vendor_id' => null,
+            // Optional category remains nullable; set explicitly when needed so parent matches.
             'product_category_id' => null,
             'unit_of_measure' => fake()->randomElement([
                 UnitOfMeasure::Each,

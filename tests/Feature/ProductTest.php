@@ -7,14 +7,10 @@ use App\Enums\UnitOfMeasure;
 use App\Models\OrganizationProduct;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\Vendor;
 use App\Support\Money;
 
 test('owners can create organization products with calculated selling price', function () {
     $ctx = createTenantUser('owner', 'parent_owner');
-    $vendor = Vendor::factory()->create([
-        'parent_account_id' => $ctx['parent']->id,
-    ]);
     $category = ProductCategory::factory()->create([
         'parent_account_id' => $ctx['parent']->id,
     ]);
@@ -26,7 +22,6 @@ test('owners can create organization products with calculated selling price', fu
             'product_family' => ProductFamily::Signage->value,
             'item_kind' => 'product',
             'vendor_sku' => 'VEN-ACM-1',
-            'vendor_id' => $vendor->id,
             'product_category_id' => $category->id,
             'unit_of_measure' => UnitOfMeasure::Each->value,
             'is_active' => true,

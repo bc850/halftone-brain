@@ -15,6 +15,7 @@ use App\Models\Vendor;
 use App\Models\VendorProductOffering;
 use App\Support\Catalog\ComponentCost\ComponentCostEstimator;
 use App\Support\Money;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * @return array{
@@ -34,7 +35,6 @@ function phase1c7bSeedGraph(string $orgRole = 'owner', ?string $parentRole = 'pa
         'item_kind' => ItemKind::Material,
         'sku' => 'MAT-ACM-'.uniqid(),
         'name' => 'ACM Sheet',
-        'vendor_id' => null,
         'vendor_sku' => null,
         'unit_of_measure' => UnitOfMeasure::Sheet,
     ]);
@@ -99,7 +99,7 @@ test('phase 1c7b creates offering with audit and leaves legacy vendor id untouch
     expect($offering->vendor_sku)->toBe('GRIMCO-ACM-SHEET')
         ->and($offering->package_quantity_scaled)->toBe(ComponentCostEstimator::quantityToScaled('10'))
         ->and($offering->status)->toBe(VendorProductOfferingStatus::Active)
-        ->and($g['product']->fresh()->vendor_id)->toBeNull()
+        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
         ->and($g['product']->fresh()->sku)->toBe($g['product']->sku)
         ->and($g['organizationProduct']->fresh()->purchase_cost_micro_units)
         ->toBe(Money::dollarsToMicroUnits('80'))
@@ -293,7 +293,6 @@ test('phase 1c7b parent authorization required and org-only admin forbidden', fu
 
     $product = Product::factory()->create([
         'parent_account_id' => $orgOnly['parent']->id,
-        'vendor_id' => null,
     ]);
     $organizationProduct = OrganizationProduct::factory()->create([
         'parent_account_id' => $orgOnly['parent']->id,

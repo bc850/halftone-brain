@@ -31,9 +31,6 @@ final class ProductResource
             'is_active' => $product->is_active,
             'list_price' => $listPriceCents !== null ? Money::centsToDollars($listPriceCents) : null,
             'suggested_sell_price' => Money::centsToDollars($suggestedCents),
-            'vendor' => $product->relationLoaded('vendor') && $product->vendor
-                ? ['id' => $product->vendor->id, 'name' => $product->vendor->name]
-                : null,
             'category' => $product->relationLoaded('category') && $product->category
                 ? ['id' => $product->category->id, 'name' => $product->category->name]
                 : null,

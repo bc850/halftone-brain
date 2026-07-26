@@ -21,6 +21,11 @@ class UpdateProductMasterRequest extends FormRequest
         return $this->user()?->can('updateMaster', $organizationProduct) ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->request->remove('vendor_id');
+    }
+
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -44,11 +49,6 @@ class UpdateProductMasterRequest extends FormRequest
             'product_family' => ['required', Rule::enum(ProductFamily::class)],
             'item_kind' => ['required', Rule::enum(ItemKind::class)],
             'vendor_sku' => ['nullable', 'string', 'max:100'],
-            'vendor_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('vendors', 'id')->where(fn ($query) => $query->where('parent_account_id', $parentId)),
-            ],
             'product_category_id' => [
                 'nullable',
                 'integer',

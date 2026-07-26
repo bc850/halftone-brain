@@ -28,7 +28,7 @@ type Vendor = {
     email: string | null;
     phone: string | null;
     is_active: boolean;
-    products_count: number;
+    offerings_count: number;
 };
 
 defineProps<{
@@ -88,7 +88,7 @@ defineOptions({
                     <tr>
                         <th class="px-4 py-3 font-medium">Name</th>
                         <th class="px-4 py-3 font-medium">Account #</th>
-                        <th class="px-4 py-3 font-medium">Products</th>
+                        <th class="px-4 py-3 font-medium">Offerings</th>
                         <th class="px-4 py-3 font-medium">Status</th>
                     </tr>
                 </thead>
@@ -110,7 +110,7 @@ defineOptions({
                             {{ vendor.account_number ?? '—' }}
                         </td>
                         <td class="px-4 py-3 text-muted-foreground">
-                            {{ vendor.products_count }}
+                            {{ vendor.offerings_count }}
                         </td>
                         <td class="px-4 py-3 text-muted-foreground">
                             {{ vendor.is_active ? 'Active' : 'Inactive' }}

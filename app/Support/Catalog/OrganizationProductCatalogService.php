@@ -60,7 +60,6 @@ final class OrganizationProductCatalogService
                 'item_kind' => $masterData['item_kind'] ?? ItemKind::Product->value,
                 'sku' => $masterData['sku'],
                 'vendor_sku' => $masterData['vendor_sku'] ?? null,
-                'vendor_id' => $masterData['vendor_id'] ?? null,
                 'product_category_id' => $masterData['product_category_id'] ?? null,
                 'unit_of_measure' => $masterData['unit_of_measure'],
                 'description' => $masterData['description'] ?? null,
@@ -234,7 +233,6 @@ final class OrganizationProductCatalogService
                 'item_kind' => $masterData['item_kind'] ?? $product->item_kind->value,
                 'sku' => $masterData['sku'],
                 'vendor_sku' => $masterData['vendor_sku'] ?? null,
-                'vendor_id' => $masterData['vendor_id'] ?? null,
                 'product_category_id' => $masterData['product_category_id'] ?? null,
                 'unit_of_measure' => $masterData['unit_of_measure'],
                 'description' => $masterData['description'] ?? null,
@@ -678,7 +676,6 @@ final class OrganizationProductCatalogService
             'item_kind' => $product->item_kind->value,
             'unit_of_measure' => $product->unit_of_measure->value,
             'is_active' => $product->is_active,
-            'vendor_id' => $product->vendor_id,
             'product_category_id' => $product->product_category_id,
         ];
     }

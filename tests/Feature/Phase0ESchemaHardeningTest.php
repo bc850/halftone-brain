@@ -149,7 +149,6 @@ test('phase 0e approved unique indexes and composite foreign keys exist with sho
         ['organization_companies', 'oc_pa_org_fk', ['parent_account_id', 'organization_id'], 'organizations'],
         ['organization_companies', 'oc_pa_co_fk', ['parent_account_id', 'company_id'], 'companies'],
         ['contacts', 'ct_pa_co_fk', ['parent_account_id', 'company_id'], 'companies'],
-        ['products', 'pr_pa_ve_fk', ['parent_account_id', 'vendor_id'], 'vendors'],
         ['products', 'pr_pa_pc_fk', ['parent_account_id', 'product_category_id'], 'product_categories'],
         ['deals', 'de_org_oc_fk', ['organization_id', 'organization_company_id'], 'organization_companies'],
         ['deals', 'de_pa_org_fk', ['parent_account_id', 'organization_id'], 'organizations'],
@@ -183,7 +182,6 @@ test('phase 0e accepts valid same-tenant inserts and optional null relationships
         'true_cost_micro_units' => 1000,
         'markup_basis_points' => 1000,
         'list_price_cents' => 110,
-        'vendor_id' => null,
         'product_category_id' => null,
         'is_active' => true,
         'created_at' => now(),
@@ -191,7 +189,6 @@ test('phase 0e accepts valid same-tenant inserts and optional null relationships
     ]);
 
     DB::table('products')->where('id', $productId)->update([
-        'vendor_id' => $g['vendor']->id,
         'product_category_id' => $g['category']->id,
     ]);
 
@@ -260,20 +257,6 @@ test('phase 0e rejects null required tenant ids and cross-tenant composites', fu
         'company_id' => $g['foreignCompany']->id,
         'first_name' => 'Bad',
         'last_name' => 'Contact',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
-
-    expect(fn () => DB::table('products')->insert([
-        'parent_account_id' => $g['parent']->id,
-        'name' => 'Bad Product',
-        'sku' => 'BAD-SKU-1',
-        'unit_of_measure' => 'each',
-        'true_cost_micro_units' => 1000,
-        'markup_basis_points' => 1000,
-        'list_price_cents' => 110,
-        'vendor_id' => $g['foreignVendor']->id,
-        'is_active' => true,
         'created_at' => now(),
         'updated_at' => now(),
     ]))->toThrow(QueryException::class);
@@ -357,8 +340,8 @@ test('phase 0e migrations roll back and remigrate cleanly', function () {
     $beforeCompaniesNullable = phase0eColumnIsNullable('companies', 'parent_account_id');
     expect($beforeCompaniesNullable)->toBeFalse();
 
-    // Phase 1C.6A (2) + Phase 1C.4 (3) + Phase 1A (2) + 0F drop + three 0E hardening migrations.
-    Artisan::call('migrate:rollback', ['--step' => 15, '--force' => true]);
+    // Phase 1C.7D (1) + Phase 1C.7A (4) + Phase 1C.6A (2) + Phase 1C.4 (3) + Phase 1A (2) + 0F drop + three 0E hardening migrations.
+    Artisan::call('migrate:rollback', ['--step' => 16, '--force' => true]);
 
     expect(phase0eColumnIsNullable('companies', 'parent_account_id'))->toBeTrue()
         ->and(phase0eHasForeign('organization_companies', 'oc_pa_org_fk', ['parent_account_id', 'organization_id'], 'organizations'))->toBeFalse()

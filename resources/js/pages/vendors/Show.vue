@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as orgShowProduct } from '@/routes/org/products';
 import {
     destroy as orgDestroy,
     edit as orgEdit,
@@ -18,7 +17,6 @@ import {
     create as createOffering,
     show as showOffering,
 } from '@/routes/org/vendors/offerings';
-import { show as legacyShowProduct } from '@/routes/products';
 import {
     destroy as legacyDestroy,
     edit as legacyEdit,
@@ -28,13 +26,6 @@ import type { Tenant } from '@/types';
 
 const destroy = useTenantRoute(legacyDestroy, orgDestroy);
 const edit = useTenantRoute(legacyEdit, orgEdit);
-const showProduct = useTenantRoute(legacyShowProduct, orgShowProduct);
-
-type Product = {
-    id: number;
-    name: string;
-    sku: string;
-};
 
 type VendorOffering = {
     id: number;
@@ -55,7 +46,6 @@ type Vendor = {
     website: string | null;
     notes: string | null;
     is_active: boolean;
-    products: Product[];
 };
 
 const props = defineProps<{
@@ -259,35 +249,6 @@ defineOptions({
                     </tbody>
                 </table>
             </div>
-        </section>
-
-        <section class="space-y-3 rounded-xl border p-4">
-            <h2 class="font-medium">Legacy product links</h2>
-            <p class="text-sm text-muted-foreground">
-                Historical products.vendor_id associations. Prefer vendor
-                offerings above for sourcing identity.
-            </p>
-            <ul class="divide-y text-sm">
-                <li
-                    v-for="product in vendor.products"
-                    :key="product.id"
-                    class="flex justify-between gap-3 py-2"
-                >
-                    <Link
-                        :href="showProduct(product.id)"
-                        class="hover:underline"
-                    >
-                        {{ product.name }}
-                    </Link>
-                    <span class="text-muted-foreground">{{ product.sku }}</span>
-                </li>
-                <li
-                    v-if="vendor.products.length === 0"
-                    class="py-4 text-muted-foreground"
-                >
-                    No products linked.
-                </li>
-            </ul>
         </section>
 
         <Button

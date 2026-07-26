@@ -32,7 +32,6 @@ type AvailableMaster = {
 
 const props = defineProps<{
     availableMasters: AvailableMaster[];
-    vendors: Option[];
     categories: Option[];
     units: SelectOption[];
     families: SelectOption[];

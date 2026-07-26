@@ -27,7 +27,6 @@ type Option = { id: number; name: string };
 type SelectOption = { value: string; label: string };
 
 defineProps<{
-    vendors: Option[];
     categories: Option[];
     units: SelectOption[];
     families: SelectOption[];
@@ -305,23 +304,6 @@ defineOptions({
                             </option>
                         </select>
                         <InputError :message="errors.unit_of_measure" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="vendor_id">Vendor</Label>
-                        <select
-                            id="vendor_id"
-                            name="vendor_id"
-                            :class="fieldClass"
-                        >
-                            <option value="">None</option>
-                            <option
-                                v-for="vendor in vendors"
-                                :key="vendor.id"
-                                :value="vendor.id"
-                            >
-                                {{ vendor.name }}
-                            </option>
-                        </select>
                     </div>
                     <div class="grid gap-2">
                         <Label for="product_category_id">Category</Label>

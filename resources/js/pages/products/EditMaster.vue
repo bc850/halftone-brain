@@ -30,7 +30,6 @@ type OrganizationProduct = {
         is_active: boolean;
         vendor_sku?: string | null;
         notes?: string | null;
-        vendor?: { id: number; name: string } | null;
         category?: { id: number; name: string } | null;
     } | null;
 };
@@ -38,7 +37,6 @@ type OrganizationProduct = {
 const props = defineProps<{
     product: OrganizationProduct;
     associatedOrganizationCount: number;
-    vendors: Option[];
     categories: Option[];
     units: SelectOption[];
     families: SelectOption[];
@@ -180,24 +178,6 @@ defineOptions({
                             </option>
                         </select>
                         <InputError :message="errors.unit_of_measure" />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="vendor_id">Vendor</Label>
-                        <select
-                            id="vendor_id"
-                            name="vendor_id"
-                            :class="fieldClass"
-                            :value="master?.vendor?.id ?? ''"
-                        >
-                            <option value="">None</option>
-                            <option
-                                v-for="vendor in vendors"
-                                :key="vendor.id"
-                                :value="vendor.id"
-                            >
-                                {{ vendor.name }}
-                            </option>
-                        </select>
                     </div>
                     <div class="grid gap-2">
                         <Label for="product_category_id">Category</Label>

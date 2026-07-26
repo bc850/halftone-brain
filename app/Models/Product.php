@@ -23,7 +23,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ItemKind $item_kind
  * @property string $sku
  * @property string|null $vendor_sku
- * @property int|null $vendor_id
  * @property int|null $product_category_id
  * @property UnitOfMeasure $unit_of_measure
  * @property int $true_cost_micro_units
@@ -42,7 +41,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'item_kind',
     'sku',
     'vendor_sku',
-    'vendor_id',
     'product_category_id',
     'unit_of_measure',
     'true_cost_micro_units',
@@ -79,19 +77,6 @@ class Product extends Model
     public function parentAccount(): BelongsTo
     {
         return $this->belongsTo(ParentAccount::class);
-    }
-
-    /**
-     * Legacy single-vendor pointer on the product master.
-     *
-     * Retained for dual-read until 1C.7D retirement. New sourcing uses
-     * {@see vendorProductOfferings()} and must not write vendor_id.
-     *
-     * @return BelongsTo<Vendor, $this>
-     */
-    public function vendor(): BelongsTo
-    {
-        return $this->belongsTo(Vendor::class);
     }
 
     /**

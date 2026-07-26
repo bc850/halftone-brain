@@ -12,7 +12,6 @@ use App\Models\Organization;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\User;
-use App\Models\Vendor;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantRoute;
 use Illuminate\Http\RedirectResponse;
@@ -33,7 +32,7 @@ class ProductController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $productsQuery = Product::query()->with(['vendor:id,name', 'category:id,name']);
+        $productsQuery = Product::query()->with(['category:id,name']);
 
         if (TenantContext::has()) {
             $productsQuery = $this->scopeProductsForRequest($productsQuery);
@@ -48,18 +47,15 @@ class ProductController extends Controller
                 });
             })
             ->when($request->integer('category_id') ?: null, fn ($query, int $categoryId) => $query->where('product_category_id', $categoryId))
-            ->when($request->integer('vendor_id') ?: null, fn ($query, int $vendorId) => $query->where('vendor_id', $vendorId))
             ->latest()
             ->paginate(15)
             ->withQueryString()
             ->through(fn (Product $product): array => ProductResource::make($product, $user));
 
         $categoriesQuery = ProductCategory::query()->orderBy('name');
-        $vendorsQuery = Vendor::query()->where('is_active', true)->orderBy('name');
 
         if (TenantContext::has()) {
             $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
-            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
         }
 
         return Inertia::render('products/Index', [
@@ -67,10 +63,8 @@ class ProductController extends Controller
             'filters' => [
                 'search' => $request->string('search')->toString(),
                 'category_id' => $request->integer('category_id') ?: null,
-                'vendor_id' => $request->integer('vendor_id') ?: null,
             ],
             'categories' => $categoriesQuery->get(['id', 'name']),
-            'vendors' => $vendorsQuery->get(['id', 'name']),
             'canManage' => $user->can('create', Product::class),
             'canViewCost' => TenantContext::has()
                 ? TenantContext::get()->canViewCost()
@@ -82,18 +76,15 @@ class ProductController extends Controller
     {
         $this->authorize('create', Product::class);
 
-        $vendorsQuery = Vendor::query()->where('is_active', true)->orderBy('name');
         $categoriesQuery = ProductCategory::query()->orderBy('sort_order')->orderBy('name');
         $relatedOptionsQuery = Product::query()->orderBy('name');
 
         if (TenantContext::has()) {
-            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
             $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
             $relatedOptionsQuery = $this->scopeProductsForRequest($relatedOptionsQuery);
         }
 
         return Inertia::render('products/Create', [
-            'vendors' => $vendorsQuery->get(['id', 'name']),
             'categories' => $categoriesQuery->get(['id', 'name']),
             'units' => collect(UnitOfMeasure::cases())->map(fn (UnitOfMeasure $unit): array => [
                 'value' => $unit->value,
@@ -134,7 +125,6 @@ class ProductController extends Controller
         $user = request()->user();
 
         $product->load([
-            'vendor:id,name',
             'category:id,name',
             'relatedProducts:id,name,sku,list_price_cents',
         ]);
@@ -152,12 +142,10 @@ class ProductController extends Controller
 
         $product->load('relatedProducts:id');
 
-        $vendorsQuery = Vendor::query()->orderBy('name');
         $categoriesQuery = ProductCategory::query()->orderBy('sort_order')->orderBy('name');
         $relatedOptionsQuery = Product::query()->whereKeyNot($product->id)->orderBy('name');
 
         if (TenantContext::has()) {
-            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
             $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
             $relatedOptionsQuery = $this->scopeProductsForRequest($relatedOptionsQuery);
         }
@@ -167,7 +155,6 @@ class ProductController extends Controller
                 ...ProductResource::make($product, request()->user()),
                 'related_product_ids' => $product->relatedProducts->pluck('id'),
             ],
-            'vendors' => $vendorsQuery->get(['id', 'name']),
             'categories' => $categoriesQuery->get(['id', 'name']),
             'units' => collect(UnitOfMeasure::cases())->map(fn (UnitOfMeasure $unit): array => [
                 'value' => $unit->value,

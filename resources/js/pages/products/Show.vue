@@ -92,7 +92,6 @@ type OrganizationProduct = {
         is_active: boolean;
         vendor_sku?: string | null;
         notes?: string | null;
-        vendor?: { id: number; name: string } | null;
         category?: { id: number; name: string } | null;
     } | null;
     purchase_cost?: string | null;
@@ -343,13 +342,6 @@ defineOptions({
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Master active</span>
                     <span>{{ product.product?.is_active ? 'Yes' : 'No' }}</span>
-                </div>
-                <div
-                    v-if="product.product?.vendor"
-                    class="flex justify-between gap-4"
-                >
-                    <span class="text-muted-foreground">Vendor</span>
-                    <span>{{ product.product.vendor.name }}</span>
                 </div>
                 <div
                     v-if="product.product?.category"

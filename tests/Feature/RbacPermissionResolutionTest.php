@@ -83,7 +83,6 @@ test('parent admin can mutate shared master data but has no automatic organizati
             'item_kind' => $product->item_kind->value,
             'unit_of_measure' => $product->unit_of_measure->value,
             'is_active' => true,
-            'vendor_id' => null,
             'product_category_id' => null,
             'description' => null,
             'vendor_sku' => null,

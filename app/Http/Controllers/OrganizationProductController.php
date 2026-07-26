@@ -33,7 +33,6 @@ use App\Models\OrganizationProductUnitConversion;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\User;
-use App\Models\Vendor;
 use App\Models\VendorProductOffering;
 use App\Support\Catalog\ComponentCost\ComponentCostMapper;
 use App\Support\Catalog\OrganizationProductCatalogService;
@@ -72,7 +71,7 @@ class OrganizationProductController extends Controller
         $tenant = $this->requireTenantContext();
 
         $query = OrganizationProduct::query()
-            ->with(['product.vendor:id,name', 'product.category:id,name', 'unitConversions'])
+            ->with(['product.category:id,name', 'unitConversions'])
             ->where('organization_id', $tenant->organizationId)
             ->where('parent_account_id', $tenant->parentAccountId);
 
@@ -167,7 +166,6 @@ class OrganizationProductController extends Controller
             'product_family' => $data['product_family'],
             'item_kind' => $data['item_kind'],
             'vendor_sku' => $data['vendor_sku'] ?? null,
-            'vendor_id' => $data['vendor_id'] ?? null,
             'product_category_id' => $data['product_category_id'] ?? null,
             'unit_of_measure' => $data['unit_of_measure'],
             'description' => $data['description'] ?? null,
@@ -261,7 +259,6 @@ class OrganizationProductController extends Controller
         /** @var User $user */
         $user = request()->user();
         $organizationProduct->load([
-            'product.vendor:id,name',
             'product.category:id,name',
             'unitConversions',
             'components.componentOrganizationProduct.product',
@@ -816,16 +813,13 @@ class OrganizationProductController extends Controller
      */
     private function formOptions(): array
     {
-        $vendorsQuery = Vendor::query()->where('is_active', true)->orderBy('name');
         $categoriesQuery = ProductCategory::query()->orderBy('sort_order')->orderBy('name');
 
         if (TenantContext::has()) {
-            $vendorsQuery = $this->scopeVendorsForRequest($vendorsQuery);
             $categoriesQuery = $this->scopeCategoriesForRequest($categoriesQuery);
         }
 
         return [
-            'vendors' => $vendorsQuery->get(['id', 'name']),
             'categories' => $categoriesQuery->get(['id', 'name']),
             'units' => collect(UnitOfMeasure::cases())->map(fn (UnitOfMeasure $unit): array => [
                 'value' => $unit->value,

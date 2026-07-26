@@ -116,9 +116,6 @@ final class OrganizationProductResource
                 'is_active' => $product->is_active,
                 'vendor_sku' => $canViewCost ? $product->vendor_sku : null,
                 'notes' => $canViewCost ? $product->notes : null,
-                'vendor' => $product->relationLoaded('vendor') && $product->vendor
-                    ? ['id' => $product->vendor->id, 'name' => $product->vendor->name]
-                    : null,
                 'category' => $product->relationLoaded('category') && $product->category
                     ? ['id' => $product->category->id, 'name' => $product->category->name]
                     : null,

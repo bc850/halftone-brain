@@ -106,7 +106,6 @@ test('legacy update destroy and stage mutations return 409 without changing rows
     ]);
     $product = Product::factory()->create([
         'parent_account_id' => $ctx['parent']->id,
-        'vendor_id' => $vendor->id,
         'product_category_id' => $category->id,
         'name' => 'Keep Product',
     ]);

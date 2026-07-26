@@ -20,10 +20,10 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Parent-scoped vendor offering mutations. Never writes products.vendor_id,
- * organization sources, preferred source, price events, or purchase cost.
- * Blocks structural edits while active sources exist and discontinuation while
- * preferred sources still reference the offering.
+ * Parent-scoped vendor offering mutations. Never writes organization sources,
+ * preferred source, price events, or purchase cost. Blocks structural edits
+ * while active sources exist and discontinuation while preferred sources still
+ * reference the offering.
  */
 final class VendorProductOfferingService
 {
@@ -40,7 +40,6 @@ final class VendorProductOfferingService
     ): VendorProductOffering {
         return DB::transaction(function () use ($tenant, $actor, $request, $data): VendorProductOffering {
             $product = $this->resolveProduct($tenant, (int) $data['product_id']);
-            $originalVendorId = $product->vendor_id;
             $vendor = $this->resolveVendor($tenant, (int) $data['vendor_id']);
             $vendorSku = $this->normalizeVendorSku((string) $data['vendor_sku']);
             $this->assertUniqueVendorSku($tenant, $vendor->id, $vendorSku);
@@ -64,8 +63,6 @@ final class VendorProductOfferingService
                     : null,
                 'status' => VendorProductOfferingStatus::Active,
             ]);
-
-            $this->assertProductVendorUntouched($product->id, $originalVendorId);
 
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
@@ -100,9 +97,6 @@ final class VendorProductOfferingService
                 ->whereKey($offering->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-
-            $product = Product::query()->whereKey($locked->product_id)->firstOrFail();
-            $originalVendorId = $product->vendor_id;
 
             $before = $this->auditPayload($locked);
             $vendorSku = $this->normalizeVendorSku((string) $data['vendor_sku']);
@@ -144,8 +138,6 @@ final class VendorProductOfferingService
                     : $locked->lead_time_days,
             ]);
             $locked->save();
-
-            $this->assertProductVendorUntouched($product->id, $originalVendorId);
 
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
@@ -379,15 +371,6 @@ final class VendorProductOfferingService
                 $query->where('vendor_product_offering_id', $offeringId);
             })
             ->exists();
-    }
-
-    private function assertProductVendorUntouched(int $productId, ?int $originalVendorId): void
-    {
-        $freshVendorId = Product::query()->whereKey($productId)->value('vendor_id');
-
-        if ($freshVendorId !== $originalVendorId) {
-            throw new \LogicException('Vendor offering mutations must not write products.vendor_id.');
-        }
     }
 
     /**

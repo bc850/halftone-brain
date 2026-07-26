@@ -59,12 +59,6 @@ class TenantSchemaHardeningGuard
                 where ct.parent_account_id is not null
                   and (c.parent_account_id is null or ct.parent_account_id <> c.parent_account_id)
                 SQL,
-            'products_parent_vendor' => <<<'SQL'
-                select count(*) as c from products p
-                join vendors v on v.id = p.vendor_id
-                where p.parent_account_id is not null
-                  and (v.parent_account_id is null or p.parent_account_id <> v.parent_account_id)
-                SQL,
             'products_parent_category' => <<<'SQL'
                 select count(*) as c from products p
                 join product_categories pc on pc.id = p.product_category_id

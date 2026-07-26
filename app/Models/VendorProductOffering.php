@@ -17,8 +17,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Parent-scoped vendor catalog offering for a Product Master.
  *
- * Does not store vendor price. Does not write products.vendor_id.
- * Legacy products.vendor_id remains untouched until 1C.7D retirement.
+ * Does not store vendor price.
+ * Legacy products.vendor_id has been retired; use offerings for vendor links.
  *
  * Package quantity uses six-decimal scaled integers
  * ({@see ComponentCostEstimator::QUANTITY_SCALE_FACTOR}).

@@ -64,7 +64,8 @@ function phase1c7aHasForeign(string $table, string $name, array $columns, string
 
 function phase1c7aRollback(): void
 {
-    Artisan::call('migrate:rollback', ['--step' => 4, '--force' => true]);
+    // Phase 1C.7D (1) + Phase 1C.7A (4).
+    Artisan::call('migrate:rollback', ['--step' => 5, '--force' => true]);
 }
 
 function phase1c7aRemigrate(): void
@@ -92,7 +93,6 @@ function phase1c7aSeedGraph(): array
         'parent_account_id' => $parent->id,
         'item_kind' => ItemKind::Material,
         'sku' => 'MAT-ACM-3MM-48X96-'.uniqid(),
-        'vendor_id' => null,
         'vendor_sku' => null,
     ]);
     $vendor = Vendor::factory()->create([
@@ -169,7 +169,7 @@ test('phase 1c7a allows multiple offerings for one product vendor with distinct 
 
     expect(VendorProductOffering::query()->where('product_id', $g['product']->id)->count())->toBe(2)
         ->and($second->package_quantity_scaled)->toBe(10_000_000)
-        ->and($g['product']->fresh()->vendor_id)->toBeNull();
+        ->and($g['product']->fresh()->sku)->toBe($g['product']->sku);
 });
 
 test('phase 1c7a rejects duplicate vendor sku within one vendor', function () {
@@ -339,7 +339,6 @@ test('phase 1c7a preferred source must belong to organization product and may be
     $otherProduct = Product::factory()->create([
         'parent_account_id' => $g['parent']->id,
         'sku' => 'OTHER-PROD-'.uniqid(),
-        'vendor_id' => null,
     ]);
     $otherOp = OrganizationProduct::factory()->create([
         'parent_account_id' => $g['parent']->id,
@@ -436,7 +435,7 @@ test('phase 1c7a rollback removes preferred then sources then offerings and remi
 
     expect(Schema::hasTable('organization_product_components'))->toBeTrue()
         ->and(Schema::hasColumn('organization_products', 'purchase_cost_micro_units'))->toBeTrue()
-        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeTrue();
+        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
 
     phase1c7aRollback();
 
@@ -456,20 +455,18 @@ test('phase 1c7a rollback removes preferred then sources then offerings and remi
         ->and(Schema::hasTable('organization_product_sources'))->toBeTrue()
         ->and(Schema::hasColumn('organization_products', 'preferred_source_id'))->toBeTrue()
         ->and(Schema::hasTable('organization_product_source_price_events'))->toBeTrue()
-        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeTrue();
+        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeFalse();
 });
 
-test('phase 1c7a schema setup does not mutate purchase cost or legacy vendor id', function () {
+test('phase 1c7a schema setup does not mutate purchase cost or product master identity', function () {
     $parent = ParentAccount::factory()->create();
     $product = Product::factory()->create([
         'parent_account_id' => $parent->id,
         'sku' => 'LEGACY-'.uniqid(),
-        'vendor_id' => null,
         'vendor_sku' => null,
     ]);
 
-    expect($product->fresh()->vendor_id)->toBeNull()
-        ->and(Schema::hasColumn('products', 'vendor_id'))->toBeTrue()
+    expect(Schema::hasColumn('products', 'vendor_id'))->toBeFalse()
         ->and(Schema::hasColumn('products', 'vendor_sku'))->toBeTrue();
 
     $organization = Organization::factory()->create([
@@ -490,6 +487,6 @@ test('phase 1c7a schema setup does not mutate purchase cost or legacy vendor id'
     ]);
 
     expect($op->fresh()->purchase_cost_micro_units)->toBe(Money::dollarsToMicroUnits('12.50'))
-        ->and($product->fresh()->vendor_id)->toBeNull()
+        ->and($product->fresh()->sku)->toBe($product->sku)
         ->and(VendorProductOfferingStatus::Active->value)->toBe('active');
 });

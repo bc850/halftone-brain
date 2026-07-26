@@ -44,7 +44,6 @@ function phase1c7cSeedGraph(string $orgRole = 'owner', ?string $parentRole = 'pa
         'item_kind' => ItemKind::Material,
         'name' => 'ACM Sheet',
         'sku' => 'MAT-ACM-'.uniqid(),
-        'vendor_id' => null,
         'unit_of_measure' => UnitOfMeasure::Sheet,
     ]);
 
@@ -494,5 +493,5 @@ test('phase 1c7c authorization cost redaction cross-org 404 and legacy 409', fun
 
     expect(OrganizationProductSource::query()->count())->toBe(2)
         ->and(OrganizationProductSourcePriceEvent::query()->count())->toBe(1)
-        ->and($g['materialMaster']->fresh()->vendor_id)->toBeNull();
+        ->and($g['materialMaster']->fresh()->sku)->toBe($g['materialMaster']->sku);
 });

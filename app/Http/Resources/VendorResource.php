@@ -28,12 +28,8 @@ final class VendorResource
             $payload['notes'] = $vendor->notes;
         }
 
-        if ($vendor->relationLoaded('products')) {
-            $payload['products'] = ProductResource::collection($vendor->products, $user);
-        }
-
-        if (isset($vendor->products_count)) {
-            $payload['products_count'] = $vendor->products_count;
+        if (isset($vendor->vendor_product_offerings_count)) {
+            $payload['offerings_count'] = $vendor->vendor_product_offerings_count;
         }
 
         return $payload;

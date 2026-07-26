@@ -30,7 +30,6 @@ type Product = {
     name: string;
     sku: string;
     vendor_sku: string | null;
-    vendor_id: number | null;
     product_category_id: number | null;
     unit_of_measure: string;
     true_cost: string;
@@ -44,7 +43,6 @@ type Product = {
 
 const props = defineProps<{
     product: Product;
-    vendors: Option[];
     categories: Option[];
     units: Unit[];
     relatedOptions: RelatedOption[];
@@ -115,24 +113,6 @@ defineOptions({
                         name="vendor_sku"
                         :default-value="product.vendor_sku ?? ''"
                     />
-                </div>
-                <div class="grid gap-2">
-                    <Label for="vendor_id">Vendor</Label>
-                    <select
-                        id="vendor_id"
-                        name="vendor_id"
-                        :class="fieldClass"
-                        :value="product.vendor_id ?? ''"
-                    >
-                        <option value="">None</option>
-                        <option
-                            v-for="vendor in vendors"
-                            :key="vendor.id"
-                            :value="vendor.id"
-                        >
-                            {{ vendor.name }}
-                        </option>
-                    </select>
                 </div>
                 <div class="grid gap-2">
                     <Label for="product_category_id">Category</Label>
