@@ -35,6 +35,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $lead_time_days
  * @property string|null $notes
  * @property int $material_cost_micro_units
+ * @property int|null $purchase_cost_micro_units
  * @property int $labor_cost_micro_units
  * @property OverheadMode $overhead_mode
  * @property int $overhead_amount_micro_units
@@ -47,6 +48,7 @@ use Illuminate\Support\Carbon;
  * @property bool $allow_price_override
  * @property string $currency_code
  * @property int $pricing_version
+ * @property int $components_version
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -65,6 +67,7 @@ use Illuminate\Support\Carbon;
     'lead_time_days',
     'notes',
     'material_cost_micro_units',
+    'purchase_cost_micro_units',
     'labor_cost_micro_units',
     'overhead_mode',
     'overhead_amount_micro_units',
@@ -77,11 +80,19 @@ use Illuminate\Support\Carbon;
     'allow_price_override',
     'currency_code',
     'pricing_version',
+    'components_version',
 ])]
 class OrganizationProduct extends Model
 {
     /** @use HasFactory<OrganizationProductFactory> */
     use HasFactory;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'components_version' => 1,
+    ];
 
     /**
      * @return array<string, string>
@@ -98,6 +109,7 @@ class OrganizationProduct extends Model
             'usage_unit_of_measure' => UnitOfMeasure::class,
             'lead_time_days' => 'integer',
             'material_cost_micro_units' => 'integer',
+            'purchase_cost_micro_units' => 'integer',
             'labor_cost_micro_units' => 'integer',
             'overhead_mode' => OverheadMode::class,
             'overhead_amount_micro_units' => 'integer',
@@ -109,6 +121,7 @@ class OrganizationProduct extends Model
             'minimum_price_cents' => 'integer',
             'allow_price_override' => 'boolean',
             'pricing_version' => 'integer',
+            'components_version' => 'integer',
         ];
     }
 
@@ -142,6 +155,26 @@ class OrganizationProduct extends Model
     public function unitConversions(): HasMany
     {
         return $this->hasMany(OrganizationProductUnitConversion::class);
+    }
+
+    /**
+     * Estimated material components for this finished organization product.
+     *
+     * @return HasMany<OrganizationProductComponent, $this>
+     */
+    public function components(): HasMany
+    {
+        return $this->hasMany(OrganizationProductComponent::class);
+    }
+
+    /**
+     * Finished items that list this organization product as a material component.
+     *
+     * @return HasMany<OrganizationProductComponent, $this>
+     */
+    public function componentUsages(): HasMany
+    {
+        return $this->hasMany(OrganizationProductComponent::class, 'component_organization_product_id');
     }
 
     /**

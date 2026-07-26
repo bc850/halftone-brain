@@ -39,6 +39,7 @@ class OrganizationProductFactory extends Factory
             'lead_time_days' => null,
             'notes' => null,
             'material_cost_micro_units' => 0,
+            'purchase_cost_micro_units' => null,
             'labor_cost_micro_units' => 0,
             'overhead_mode' => OverheadMode::None,
             'overhead_amount_micro_units' => 0,
@@ -51,6 +52,7 @@ class OrganizationProductFactory extends Factory
             'allow_price_override' => false,
             'currency_code' => 'USD',
             'pricing_version' => 1,
+            'components_version' => 1,
         ];
     }
 }

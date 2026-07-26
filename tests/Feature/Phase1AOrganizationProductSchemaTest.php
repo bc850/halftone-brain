@@ -55,8 +55,8 @@ function phase1aHasForeign(string $table, string $name, array $columns, string $
 
 function phase1aRollback(): void
 {
-    // Phase 1C.4 (3) + Phase 1A (2).
-    Artisan::call('migrate:rollback', ['--step' => 5, '--force' => true]);
+    // Phase 1C.6A (2) + Phase 1C.4 (3) + Phase 1A (2).
+    Artisan::call('migrate:rollback', ['--step' => 7, '--force' => true]);
 }
 
 function phase1aRemigrate(): void
@@ -265,7 +265,7 @@ test('phase 1a rollback aborts when cross-parent duplicate skus exist', function
         'sku' => 'ROLLBACK-DUP-SKU',
     ]);
 
-    expect(fn () => Artisan::call('migrate:rollback', ['--step' => 5, '--force' => true]))
+    expect(fn () => Artisan::call('migrate:rollback', ['--step' => 7, '--force' => true]))
         ->toThrow(RuntimeException::class, 'duplicate SKUs across parents');
 
     expect(Schema::hasTable('organization_products'))->toBeTrue()
