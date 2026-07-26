@@ -100,7 +100,7 @@ final class ComponentCostEstimator
         $purchaseUnit = $component->purchaseUnitOfMeasure;
         assert($purchaseUnit instanceof UnitOfMeasure);
 
-        $resolved = $this->resolveConversion(
+        $resolved = $this->resolveUsageToPurchase(
             $component->usageUnitOfMeasure,
             $purchaseUnit,
             $component->conversions,
@@ -161,10 +161,12 @@ final class ComponentCostEstimator
     }
 
     /**
-     * @param  list<ComponentConversionInput>  $conversions
+     * Resolve usage→purchase conversion using identical, direct, or reciprocal only.
+     *
+     * @param  array<int, ComponentConversionInput>  $conversions
      * @return array{numerator: int, denominator: int, direction: ComponentConversionDirection}
      */
-    private function resolveConversion(
+    public function resolveUsageToPurchase(
         UnitOfMeasure $usageUnit,
         UnitOfMeasure $purchaseUnit,
         array $conversions,

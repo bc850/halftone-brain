@@ -23,6 +23,7 @@ test('matching pricing version updates and increments once', function () {
     $this->actingAs($ctx['user'])
         ->patch(route('org.products.update-pricing', [$ctx['organization'], $op]), [
             'pricing_version' => 3,
+            'components_version' => 1,
             'material_cost' => '50',
             'labor_cost' => '30',
             'overhead_mode' => OverheadMode::Fixed->value,
@@ -54,6 +55,7 @@ test('stale pricing version returns 409 and changes nothing', function () {
     $this->actingAs($ctx['user'])
         ->patch(route('org.products.update-pricing', [$ctx['organization'], $op]), [
             'pricing_version' => 1,
+            'components_version' => 1,
             'material_cost' => '99',
             'labor_cost' => '0',
             'overhead_mode' => OverheadMode::None->value,

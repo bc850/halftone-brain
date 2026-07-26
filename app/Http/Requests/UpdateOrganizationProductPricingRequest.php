@@ -29,6 +29,7 @@ class UpdateOrganizationProductPricingRequest extends FormRequest
     {
         return [
             'pricing_version' => ['required', 'integer', 'min:1'],
+            'components_version' => ['required', 'integer', 'min:1'],
             'material_cost' => ['required', 'regex:/^\d+(\.\d{1,4})?$/'],
             'labor_cost' => ['required', 'regex:/^\d+(\.\d{1,4})?$/'],
             'overhead_mode' => ['required', Rule::enum(OverheadMode::class)],
@@ -54,8 +55,9 @@ class UpdateOrganizationProductPricingRequest extends FormRequest
             return $validated;
         }
 
-        $normalized = $this->normalizeOrganizationPricing($validated, requireCompletePricing: true);
+        $normalized = $this->normalizeOrganizationPricing($validated, requireCompletePricing: false);
         $normalized['pricing_version'] = (int) $validated['pricing_version'];
+        $normalized['components_version'] = (int) $validated['components_version'];
 
         return $normalized;
     }

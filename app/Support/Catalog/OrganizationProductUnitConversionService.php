@@ -7,6 +7,7 @@ use App\Models\OrganizationProductUnitConversion;
 use App\Models\ParentAccount;
 use App\Models\User;
 use App\Support\Audit\Auditor;
+use App\Support\Catalog\ComponentCost\ComponentDependencyVersionService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,10 @@ use Illuminate\Validation\ValidationException;
  */
 final class OrganizationProductUnitConversionService
 {
-    public function __construct(private Auditor $auditor) {}
+    public function __construct(
+        private Auditor $auditor,
+        private ComponentDependencyVersionService $componentVersions,
+    ) {}
 
     /**
      * @param  array{from_unit: string, to_unit: string, numerator: int, denominator: int, is_active?: bool}  $data
@@ -57,6 +61,8 @@ final class OrganizationProductUnitConversionService
                 'denominator' => (int) $data['denominator'],
                 'is_active' => (bool) ($data['is_active'] ?? true),
             ]);
+
+            $this->componentVersions->invalidateDependentsOfMaterial($organizationProduct);
 
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
@@ -103,7 +109,7 @@ final class OrganizationProductUnitConversionService
             ]);
         }
 
-        return DB::transaction(function () use ($tenant, $actor, $request, $conversion, $data): OrganizationProductUnitConversion {
+        return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $conversion, $data): OrganizationProductUnitConversion {
             $before = $this->auditPayload($conversion);
 
             $conversion->fill([
@@ -116,6 +122,8 @@ final class OrganizationProductUnitConversionService
                     : $conversion->is_active,
             ]);
             $conversion->save();
+
+            $this->componentVersions->invalidateDependentsOfMaterial($organizationProduct);
 
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
@@ -184,9 +192,11 @@ final class OrganizationProductUnitConversionService
         $this->assertTenantOwnsProduct($tenant, $organizationProduct);
         $this->assertConversionBelongsToProduct($organizationProduct, $conversion);
 
-        return DB::transaction(function () use ($tenant, $actor, $request, $conversion, $active, $action): OrganizationProductUnitConversion {
+        return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $conversion, $active, $action): OrganizationProductUnitConversion {
             $before = $this->auditPayload($conversion);
             $conversion->update(['is_active' => $active]);
+
+            $this->componentVersions->invalidateDependentsOfMaterial($organizationProduct);
 
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),

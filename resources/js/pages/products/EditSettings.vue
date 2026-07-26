@@ -8,7 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTenantRoute } from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
-import { show as orgShow, updateSettings } from '@/routes/org/products';
+import {
+    show as orgShow,
+    updatePurchaseCost,
+    updateSettings,
+} from '@/routes/org/products';
 import conversions from '@/routes/org/products/conversions';
 import { index as legacyIndex, show as legacyShow } from '@/routes/products';
 import type { Tenant } from '@/types';
@@ -46,6 +50,7 @@ type OrganizationProduct = {
     unit_setup_incomplete: boolean;
     unit_setup_warning: string | null;
     unit_conversions: UnitConversion[];
+    purchase_cost?: string | null;
 };
 
 const props = defineProps<{
@@ -54,6 +59,7 @@ const props = defineProps<{
     inventoryModes: SelectOption[];
     itemKind: string;
     canManageConversions: boolean;
+    canUpdatePurchaseCost: boolean;
 }>();
 
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
@@ -87,6 +93,23 @@ const conversionFormTitle = computed(() =>
     editingConversionId.value === null
         ? 'Add unit conversion'
         : 'Edit unit conversion',
+);
+
+const purchaseUnitLabel = computed(() => {
+    const value = props.product.purchase_unit_of_measure;
+
+    if (!value) {
+        return null;
+    }
+
+    return (
+        props.units.find((unit) => unit.value === value)?.label ??
+        value.replaceAll('_', ' ')
+    );
+});
+
+const showPurchaseCostSection = computed(
+    () => props.product.is_purchasable && props.canUpdatePurchaseCost,
 );
 
 watch(isPurchasable, (purchasable) => {
@@ -411,6 +434,56 @@ defineOptions({
                 </Button>
             </div>
         </Form>
+
+        <section
+            v-if="showPurchaseCostSection && slug"
+            class="mx-auto grid w-full max-w-3xl gap-4 rounded-xl border border-dashed p-4"
+        >
+            <div class="space-y-1">
+                <h2 class="text-lg font-semibold">Purchase cost</h2>
+                <p class="text-sm text-muted-foreground">
+                    Separate from selling price settings. Used when this item is
+                    purchased as a material.
+                </p>
+            </div>
+
+            <p
+                v-if="!product.purchase_unit_of_measure"
+                class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+                Purchase unit of measure is required when setting purchase cost.
+                Set the purchase unit above, save settings, then return here.
+            </p>
+
+            <Form
+                v-bind="updatePurchaseCost.form([slug, product.id])"
+                class="grid gap-4"
+                v-slot="{
+                    errors: purchaseCostErrors,
+                    processing: savingPurchaseCost,
+                }"
+            >
+                <div class="grid gap-2">
+                    <Label for="purchase_cost">
+                        Purchase cost per
+                        {{ purchaseUnitLabel ?? 'purchase unit' }}
+                    </Label>
+                    <Input
+                        id="purchase_cost"
+                        name="purchase_cost"
+                        :default-value="product.purchase_cost ?? ''"
+                        placeholder="Leave blank to clear"
+                    />
+                    <p class="text-sm text-muted-foreground">
+                        Leave blank to clear the purchase cost.
+                    </p>
+                    <InputError :message="purchaseCostErrors.purchase_cost" />
+                </div>
+                <Button type="submit" :disabled="savingPurchaseCost">
+                    Save purchase cost
+                </Button>
+            </Form>
+        </section>
 
         <section
             v-if="canManageConversions && slug"

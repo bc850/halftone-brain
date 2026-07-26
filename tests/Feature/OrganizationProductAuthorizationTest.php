@@ -90,6 +90,7 @@ test('pricing manage plus cost permission required for pricing updates', functio
     $this->actingAs($ctx['user'])
         ->patch(route('org.products.update-pricing', [$ctx['organization'], $op]), [
             'pricing_version' => 1,
+            'components_version' => 1,
             'material_cost' => '10',
             'labor_cost' => '10',
             'overhead_mode' => OverheadMode::None->value,

@@ -11,7 +11,7 @@ use App\Enums\UnitOfMeasure;
 final readonly class ComponentLineInput
 {
     /**
-     * @param  list<ComponentConversionInput>  $conversions
+     * @param  array<int, ComponentConversionInput>  $conversions
      */
     public function __construct(
         public int $componentOrganizationProductId,

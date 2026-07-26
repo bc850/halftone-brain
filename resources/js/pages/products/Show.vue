@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,27 @@ type UnitConversion = {
     is_active: boolean;
 };
 
+type ProductComponent = {
+    id: number;
+    quantity: string;
+    usage_uom: string;
+    usage_uom_label: string;
+    waste_percent: string;
+    waste_adjusted_quantity?: string;
+    converted_purchase_quantity?: string;
+    purchase_unit_of_measure_label?: string;
+    estimated_component_cost?: string;
+    estimate_error?: string;
+    is_active: boolean;
+    material: {
+        id: number;
+        display_name: string | null;
+        sku: string | null;
+        purchase_cost?: string | null;
+        purchase_unit_of_measure_label?: string | null;
+    } | null;
+};
+
 type OrganizationProduct = {
     id: number;
     display_name: string;
@@ -37,10 +59,14 @@ type OrganizationProduct = {
     organization_notes: string | null;
     pricing_method: string;
     pricing_version: number;
+    components_version: number;
+    material_cost_source: 'manual' | 'components';
+    estimate_stale: boolean;
     unit_selling_price: string | null;
     unit_setup_incomplete: boolean;
     unit_setup_warning: string | null;
     unit_conversions: UnitConversion[];
+    components: ProductComponent[];
     product: {
         id: number;
         name: string;
@@ -56,7 +82,9 @@ type OrganizationProduct = {
         vendor?: { id: number; name: string } | null;
         category?: { id: number; name: string } | null;
     } | null;
+    purchase_cost?: string | null;
     material_cost?: string;
+    estimated_material_cost?: string | null;
     labor_cost?: string;
     overhead_mode?: string;
     overhead_amount?: string;
@@ -76,13 +104,27 @@ const props = defineProps<{
     canUpdateMaster: boolean;
     canUpdateSettings: boolean;
     canManageConversions: boolean;
+    canManageComponents: boolean;
     canUpdatePricing: boolean;
+    canUpdatePurchaseCost: boolean;
     canArchive: boolean;
     canViewCost: boolean;
 }>();
 
 const slug = (usePage().props.tenant as Tenant | null | undefined)?.organization
     ?.slug;
+
+const showsEstimatedMaterials = computed(() => {
+    const kind = props.product.product?.item_kind;
+
+    return (
+        props.product.is_sellable && (kind === 'product' || kind === 'service')
+    );
+});
+
+const canOpenPricing = computed(
+    () => props.canManageComponents || props.canUpdatePricing,
+);
 
 function formatUnit(value: string | null | undefined): string {
     if (!value) {
@@ -192,6 +234,13 @@ defineOptions({
             {{ product.unit_setup_warning }}
         </p>
 
+        <p
+            v-if="product.estimate_stale"
+            class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+            Material estimate changed. Review and save pricing.
+        </p>
+
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="space-y-2 rounded-xl border p-4 text-sm">
                 <h2 class="font-medium">Shared product master</h2>
@@ -260,6 +309,17 @@ defineOptions({
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground">Purchasable</span>
                     <span>{{ product.is_purchasable ? 'Yes' : 'No' }}</span>
+                </div>
+                <div
+                    v-if="canViewCost && product.is_purchasable"
+                    class="flex justify-between gap-4"
+                >
+                    <span class="text-muted-foreground">Purchase cost</span>
+                    <span>{{
+                        product.purchase_cost
+                            ? `$${product.purchase_cost}`
+                            : '—'
+                    }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
                     <span class="text-muted-foreground"
@@ -352,6 +412,141 @@ defineOptions({
             </section>
 
             <section
+                v-if="showsEstimatedMaterials"
+                class="space-y-3 rounded-xl border p-4 text-sm lg:col-span-2"
+            >
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="font-medium">Estimated materials</h2>
+                    <Button
+                        v-if="canOpenPricing && slug"
+                        variant="outline"
+                        size="sm"
+                        as-child
+                    >
+                        <Link :href="editPricing.url([slug, product.id])">
+                            Edit pricing
+                        </Link>
+                    </Button>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground"
+                            >Components version</span
+                        >
+                        <span>{{ product.components_version }}</span>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-muted-foreground"
+                            >Material cost source</span
+                        >
+                        <span class="capitalize">{{
+                            product.material_cost_source
+                        }}</span>
+                    </div>
+                    <div
+                        v-if="canViewCost && product.estimated_material_cost"
+                        class="flex justify-between gap-4 sm:col-span-2"
+                    >
+                        <span class="text-muted-foreground"
+                            >Estimated material cost</span
+                        >
+                        <span>${{ product.estimated_material_cost }}</span>
+                    </div>
+                </div>
+                <p class="text-muted-foreground">
+                    Estimated usage for costing. This does not reduce inventory
+                    or change QuickBooks quantities.
+                </p>
+                <div
+                    v-if="product.components.length === 0"
+                    class="text-muted-foreground"
+                >
+                    No materials configured yet.
+                </div>
+                <ul v-else class="space-y-2">
+                    <li
+                        v-for="component in product.components"
+                        :key="component.id"
+                        class="rounded-lg border p-3"
+                        :class="{ 'opacity-60': !component.is_active }"
+                    >
+                        <div
+                            class="flex flex-wrap items-start justify-between gap-2"
+                        >
+                            <div class="space-y-1">
+                                <p class="font-medium">
+                                    {{
+                                        component.material?.display_name ??
+                                        'Material'
+                                    }}
+                                    <span
+                                        v-if="component.material?.sku"
+                                        class="text-muted-foreground"
+                                    >
+                                        · {{ component.material.sku }}
+                                    </span>
+                                </p>
+                                <p>
+                                    Qty {{ component.quantity }}
+                                    {{ component.usage_uom_label }} · Waste
+                                    {{ component.waste_percent }}%
+                                </p>
+                                <p
+                                    v-if="component.waste_adjusted_quantity"
+                                    class="text-muted-foreground"
+                                >
+                                    Waste-adjusted
+                                    {{ component.waste_adjusted_quantity }}
+                                    {{ component.usage_uom_label }}
+                                    <template
+                                        v-if="
+                                            component.converted_purchase_quantity
+                                        "
+                                    >
+                                        ·
+                                        {{
+                                            component.converted_purchase_quantity
+                                        }}
+                                        {{
+                                            component.purchase_unit_of_measure_label
+                                        }}
+                                    </template>
+                                </p>
+                                <p
+                                    v-if="
+                                        canViewCost &&
+                                        component.estimated_component_cost
+                                    "
+                                    class="text-muted-foreground"
+                                >
+                                    Estimated cost ${{
+                                        component.estimated_component_cost
+                                    }}
+                                </p>
+                                <p
+                                    v-if="component.estimate_error"
+                                    class="text-destructive"
+                                >
+                                    {{ component.estimate_error }}
+                                </p>
+                            </div>
+                            <Badge
+                                :variant="
+                                    component.is_active
+                                        ? 'outline'
+                                        : 'destructive'
+                                "
+                            >
+                                {{
+                                    component.is_active ? 'Active' : 'Inactive'
+                                }}
+                            </Badge>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
+            <section
                 v-if="product.is_sellable"
                 class="space-y-2 rounded-xl border p-4 text-sm lg:col-span-2"
             >
@@ -378,6 +573,20 @@ defineOptions({
                         }}
                     </span>
                 </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground"
+                        >Components version</span
+                    >
+                    <span>{{ product.components_version }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground"
+                        >Material cost source</span
+                    >
+                    <span class="capitalize">{{
+                        product.material_cost_source
+                    }}</span>
+                </div>
                 <template v-if="canViewCost">
                     <div class="flex justify-between gap-4">
                         <span class="text-muted-foreground"
@@ -396,6 +605,15 @@ defineOptions({
                     <div class="flex justify-between gap-4">
                         <span class="text-muted-foreground">Material cost</span>
                         <span>${{ product.material_cost }}</span>
+                    </div>
+                    <div
+                        v-if="product.estimated_material_cost"
+                        class="flex justify-between gap-4"
+                    >
+                        <span class="text-muted-foreground"
+                            >Estimated material cost</span
+                        >
+                        <span>${{ product.estimated_material_cost }}</span>
                     </div>
                     <div class="flex justify-between gap-4">
                         <span class="text-muted-foreground">Labor cost</span>

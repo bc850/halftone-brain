@@ -7,13 +7,21 @@ use App\Enums\ItemKind;
 use App\Enums\OverheadMode;
 use App\Enums\PricingMethod;
 use App\Models\OrganizationProduct;
+use App\Models\OrganizationProductComponent;
 use App\Models\ParentAccount;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\Audit\Auditor;
+use App\Support\Catalog\ComponentCost\ComponentCostEstimator;
+use App\Support\Catalog\ComponentCost\ComponentCostMapper;
+use App\Support\Catalog\ComponentCost\ComponentDependencyVersionService;
+use App\Support\Catalog\ComponentCost\InvalidComponentCostException;
+use App\Support\Pricing\InvalidPricingException;
 use App\Support\Pricing\PricingCalculator;
+use App\Support\Pricing\PricingInput;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -23,7 +31,12 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 final class OrganizationProductCatalogService
 {
-    public function __construct(private Auditor $auditor) {}
+    public function __construct(
+        private Auditor $auditor,
+        private ComponentDependencyVersionService $componentVersions,
+        private ComponentCostMapper $componentCostMapper,
+        private ComponentCostEstimator $componentCostEstimator,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $masterData
@@ -86,6 +99,7 @@ final class OrganizationProductCatalogService
                 'allow_price_override' => (bool) $organizationData['allow_price_override'],
                 'currency_code' => PricingCalculator::CURRENCY_USD,
                 'pricing_version' => 1,
+                'components_version' => 1,
             ]);
 
             $this->auditor->append(
@@ -180,6 +194,7 @@ final class OrganizationProductCatalogService
                 'allow_price_override' => (bool) ($organizationData['allow_price_override'] ?? false),
                 'currency_code' => PricingCalculator::CURRENCY_USD,
                 'pricing_version' => 1,
+                'components_version' => 1,
             ]);
 
             $this->auditor->append(
@@ -210,8 +225,9 @@ final class OrganizationProductCatalogService
     ): OrganizationProduct {
         $product = $organizationProduct->product()->firstOrFail();
         $before = $this->masterAuditPayload($product);
+        $previousKind = $product->item_kind;
 
-        return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $product, $masterData, $before): OrganizationProduct {
+        return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $product, $masterData, $before, $previousKind): OrganizationProduct {
             $product->update([
                 'name' => $masterData['name'],
                 'product_family' => $masterData['product_family'],
@@ -226,6 +242,16 @@ final class OrganizationProductCatalogService
                 'is_active' => (bool) ($masterData['is_active'] ?? $product->is_active),
             ]);
 
+            $fresh = $product->fresh() ?? $product;
+            $newKind = $fresh->item_kind;
+
+            if (
+                $previousKind !== $newKind
+                && ($previousKind === ItemKind::Material || $newKind === ItemKind::Material)
+            ) {
+                $this->componentVersions->invalidateDependentsOfProductMaster($fresh);
+            }
+
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
                 action: 'catalog.product_master.updated',
@@ -234,7 +260,7 @@ final class OrganizationProductCatalogService
                 organization: $tenant->organization,
                 actor: $actor,
                 before: $before,
-                after: $this->masterAuditPayload($product->fresh()),
+                after: $this->masterAuditPayload($fresh),
                 ip: $request->ip(),
                 userAgent: $request->userAgent(),
             );
@@ -256,6 +282,10 @@ final class OrganizationProductCatalogService
         $before = $this->settingsAuditPayload($organizationProduct);
 
         return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $settings, $before): OrganizationProduct {
+            $previousPurchaseUom = $organizationProduct->purchase_unit_of_measure?->value;
+            $previousPurchasable = $organizationProduct->is_purchasable;
+            $previousAvailable = $organizationProduct->is_available;
+
             $organizationProduct->update([
                 'display_name' => $settings['display_name'] ?? null,
                 'is_available' => (bool) ($settings['is_available'] ?? $organizationProduct->is_available),
@@ -269,6 +299,16 @@ final class OrganizationProductCatalogService
                 'notes' => $settings['notes'] ?? null,
             ]);
 
+            $fresh = $organizationProduct->fresh() ?? $organizationProduct;
+
+            $shouldInvalidate = $previousPurchaseUom !== $fresh->purchase_unit_of_measure?->value
+                || $previousPurchasable !== $fresh->is_purchasable
+                || $previousAvailable !== $fresh->is_available;
+
+            if ($shouldInvalidate) {
+                $this->componentVersions->invalidateDependentsOfMaterial($fresh);
+            }
+
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
                 action: 'catalog.organization_product.settings_updated',
@@ -277,12 +317,90 @@ final class OrganizationProductCatalogService
                 organization: $tenant->organization,
                 actor: $actor,
                 before: $before,
-                after: $this->settingsAuditPayload($organizationProduct->fresh()),
+                after: $this->settingsAuditPayload($fresh),
                 ip: $request->ip(),
                 userAgent: $request->userAgent(),
             );
 
-            return $organizationProduct->fresh(['product']) ?? $organizationProduct;
+            return $fresh->load('product');
+        });
+    }
+
+    /**
+     * Update purchase cost for a purchasable organization product (per purchase UOM).
+     */
+    public function updatePurchaseCost(
+        TenantContext $tenant,
+        User $actor,
+        Request $request,
+        OrganizationProduct $organizationProduct,
+        ?int $purchaseCostMicroUnits,
+    ): OrganizationProduct {
+        if (
+            $organizationProduct->organization_id !== $tenant->organizationId
+            || $organizationProduct->parent_account_id !== $tenant->parentAccountId
+        ) {
+            abort(404);
+        }
+
+        return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $purchaseCostMicroUnits): OrganizationProduct {
+            $locked = OrganizationProduct::query()
+                ->whereKey($organizationProduct->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($purchaseCostMicroUnits !== null) {
+                if (! $locked->is_purchasable) {
+                    throw ValidationException::withMessages([
+                        'purchase_cost' => 'Purchase cost can only be set on purchasable products.',
+                    ]);
+                }
+
+                if ($locked->purchase_unit_of_measure === null) {
+                    throw ValidationException::withMessages([
+                        'purchase_cost' => 'Purchase unit of measure is required when setting purchase cost.',
+                    ]);
+                }
+
+                if ($purchaseCostMicroUnits < 0) {
+                    throw ValidationException::withMessages([
+                        'purchase_cost' => 'Purchase cost cannot be negative.',
+                    ]);
+                }
+            }
+
+            $before = [
+                'purchase_cost_micro_units' => $locked->purchase_cost_micro_units,
+                'purchase_unit_of_measure' => $locked->purchase_unit_of_measure?->value,
+                'is_purchasable' => $locked->is_purchasable,
+            ];
+
+            $previousCost = $locked->purchase_cost_micro_units;
+            $locked->forceFill(['purchase_cost_micro_units' => $purchaseCostMicroUnits])->save();
+
+            if ($previousCost !== $purchaseCostMicroUnits) {
+                $this->componentVersions->invalidateDependentsOfMaterial($locked);
+            }
+
+            $this->auditor->append(
+                parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
+                action: 'catalog.organization_product.purchase_cost_updated',
+                subjectType: OrganizationProduct::class,
+                subjectId: $locked->id,
+                organization: $tenant->organization,
+                actor: $actor,
+                before: $before,
+                after: [
+                    'purchase_cost_micro_units' => $locked->purchase_cost_micro_units,
+                    'purchase_unit_of_measure' => $locked->purchase_unit_of_measure?->value,
+                    'is_purchasable' => $locked->is_purchasable,
+                    'components_version' => $locked->fresh()?->components_version,
+                ],
+                ip: $request->ip(),
+                userAgent: $request->userAgent(),
+            );
+
+            return $locked->fresh(['product']) ?? $locked;
         });
     }
 
@@ -295,22 +413,36 @@ final class OrganizationProductCatalogService
         Request $request,
         OrganizationProduct $organizationProduct,
         array $pricing,
-        int $expectedVersion,
+        int $expectedPricingVersion,
+        int $expectedComponentsVersion,
     ): OrganizationProduct {
-        return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $pricing, $expectedVersion): OrganizationProduct {
+        return DB::transaction(function () use (
+            $tenant,
+            $actor,
+            $request,
+            $organizationProduct,
+            $pricing,
+            $expectedPricingVersion,
+            $expectedComponentsVersion,
+        ): OrganizationProduct {
             $locked = OrganizationProduct::query()
                 ->whereKey($organizationProduct->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($locked->pricing_version !== $expectedVersion) {
-                throw new HttpException(
-                    409,
-                    'Pricing was updated by another user. Refresh and review the latest values before saving.'
-                );
+            $this->assertPricingAndComponentsVersions($locked, $expectedPricingVersion, $expectedComponentsVersion);
+
+            $activeComponents = $this->activeComponentsFor($locked);
+            $materialSource = $activeComponents->isNotEmpty() ? 'components' : 'manual';
+
+            if ($activeComponents->isNotEmpty()) {
+                $pricing['material_cost_micro_units'] = $this->estimateMaterialCostMicroUnits($locked, $activeComponents);
             }
 
+            $this->assertPricingConfiguration($pricing);
+
             $before = $this->pricingAuditPayload($locked);
+            $before['material_source'] = $materialSource;
 
             $locked->fill([
                 'material_cost_micro_units' => $pricing['material_cost_micro_units'],
@@ -329,6 +461,9 @@ final class OrganizationProductCatalogService
             ]);
             $locked->save();
 
+            $after = $this->pricingAuditPayload($locked);
+            $after['material_source'] = $materialSource;
+
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
                 action: 'catalog.organization_product.pricing_updated',
@@ -337,13 +472,54 @@ final class OrganizationProductCatalogService
                 organization: $tenant->organization,
                 actor: $actor,
                 before: $before,
-                after: $this->pricingAuditPayload($locked),
+                after: $after,
                 ip: $request->ip(),
                 userAgent: $request->userAgent(),
             );
 
             return $locked->load('product');
         });
+    }
+
+    /**
+     * Preview pricing with optional component re-estimate. No writes.
+     *
+     * @param  array<string, mixed>  $pricing
+     * @return array{material_cost_micro_units: int, material_source: string}
+     */
+    public function resolvePreviewMaterialCost(
+        OrganizationProduct $organizationProduct,
+        array $pricing,
+        int $expectedPricingVersion,
+        int $expectedComponentsVersion,
+    ): array {
+        if ($organizationProduct->pricing_version !== $expectedPricingVersion) {
+            throw new HttpException(
+                409,
+                'Pricing was updated by another user. Refresh and review the latest values before saving.'
+            );
+        }
+
+        if ($organizationProduct->components_version !== $expectedComponentsVersion) {
+            throw new HttpException(
+                409,
+                'Component costs changed. Refresh and review the latest estimate before continuing.'
+            );
+        }
+
+        $activeComponents = $this->activeComponentsFor($organizationProduct);
+
+        if ($activeComponents->isNotEmpty()) {
+            return [
+                'material_cost_micro_units' => $this->estimateMaterialCostMicroUnits($organizationProduct, $activeComponents),
+                'material_source' => 'components',
+            ];
+        }
+
+        return [
+            'material_cost_micro_units' => (int) $pricing['material_cost_micro_units'],
+            'material_source' => 'manual',
+        ];
     }
 
     public function archive(
@@ -355,7 +531,12 @@ final class OrganizationProductCatalogService
         $before = ['is_available' => $organizationProduct->is_available];
 
         return DB::transaction(function () use ($tenant, $actor, $request, $organizationProduct, $before): OrganizationProduct {
+            $wasAvailable = $organizationProduct->is_available;
             $organizationProduct->update(['is_available' => false]);
+
+            if ($wasAvailable) {
+                $this->componentVersions->invalidateDependentsOfMaterial($organizationProduct);
+            }
 
             $this->auditor->append(
                 parentAccount: ParentAccount::query()->whereKey($tenant->parentAccountId)->firstOrFail(),
@@ -365,13 +546,113 @@ final class OrganizationProductCatalogService
                 organization: $tenant->organization,
                 actor: $actor,
                 before: $before,
-                after: ['is_available' => false, 'pricing_version' => $organizationProduct->pricing_version],
+                after: [
+                    'is_available' => false,
+                    'pricing_version' => $organizationProduct->pricing_version,
+                    'components_version' => $organizationProduct->fresh()?->components_version,
+                ],
                 ip: $request->ip(),
                 userAgent: $request->userAgent(),
             );
 
             return $organizationProduct->fresh(['product']) ?? $organizationProduct;
         });
+    }
+
+    public function assertPricingAndComponentsVersions(
+        OrganizationProduct $locked,
+        int $expectedPricingVersion,
+        int $expectedComponentsVersion,
+    ): void {
+        if ($locked->pricing_version !== $expectedPricingVersion) {
+            throw new HttpException(
+                409,
+                'Pricing was updated by another user. Refresh and review the latest values before saving.'
+            );
+        }
+
+        if ($locked->components_version !== $expectedComponentsVersion) {
+            throw new HttpException(
+                409,
+                'Component costs changed. Refresh and review the latest estimate before saving.'
+            );
+        }
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, OrganizationProductComponent>
+     */
+    public function activeComponentsFor(OrganizationProduct $organizationProduct)
+    {
+        return OrganizationProductComponent::query()
+            ->with(['componentOrganizationProduct.product', 'componentOrganizationProduct.unitConversions'])
+            ->where('organization_product_id', $organizationProduct->id)
+            ->where('organization_id', $organizationProduct->organization_id)
+            ->where('parent_account_id', $organizationProduct->parent_account_id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, OrganizationProductComponent>  $components
+     */
+    public function estimateMaterialCostMicroUnits(
+        OrganizationProduct $finished,
+        $components,
+    ): int {
+        $finished->loadMissing('product');
+
+        try {
+            $estimate = $this->componentCostEstimator->estimate(
+                $this->componentCostMapper->toEstimateInput($finished, $components),
+            );
+        } catch (InvalidComponentCostException $exception) {
+            throw ValidationException::withMessages([
+                'components' => $exception->getMessage(),
+            ]);
+        }
+
+        return $estimate->totalEstimatedMaterialCostMicroUnits;
+    }
+
+    /**
+     * @param  array<string, mixed>  $pricing
+     */
+    private function assertPricingConfiguration(array $pricing): void
+    {
+        try {
+            $input = new PricingInput(
+                materialCostMicroUnits: (int) $pricing['material_cost_micro_units'],
+                laborCostMicroUnits: (int) $pricing['labor_cost_micro_units'],
+                overheadMode: OverheadMode::from((string) $pricing['overhead_mode']),
+                overheadAmountMicroUnits: (int) $pricing['overhead_amount_micro_units'],
+                overheadRateBasisPoints: (int) $pricing['overhead_rate_basis_points'],
+                pricingMethod: PricingMethod::from((string) $pricing['pricing_method']),
+                markupBasisPoints: (int) $pricing['markup_basis_points'],
+                targetMarginBasisPoints: (int) $pricing['target_margin_basis_points'],
+                fixedPriceCents: $pricing['fixed_price_cents'] !== null ? (int) $pricing['fixed_price_cents'] : null,
+                minimumPriceCents: $pricing['minimum_price_cents'] !== null ? (int) $pricing['minimum_price_cents'] : null,
+                allowPriceOverride: (bool) $pricing['allow_price_override'],
+                requestedOverridePriceCents: null,
+                quantity: '1',
+                currencyCode: PricingCalculator::CURRENCY_USD,
+                pricingVersion: 1,
+            );
+
+            $result = (new PricingCalculator)->calculate($input);
+        } catch (InvalidPricingException $exception) {
+            throw ValidationException::withMessages([
+                'pricing' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($result->belowMinimum) {
+            throw ValidationException::withMessages([
+                'minimum_price' => 'The calculated selling price cannot be below the minimum selling price.',
+            ]);
+        }
     }
 
     /**
@@ -410,6 +691,8 @@ final class OrganizationProductCatalogService
             ...$this->pricingAuditPayload($organizationProduct),
             'product_id' => $organizationProduct->product_id,
             'organization_id' => $organizationProduct->organization_id,
+            'purchase_cost_micro_units' => $organizationProduct->purchase_cost_micro_units,
+            'components_version' => $organizationProduct->components_version,
         ];
     }
 
@@ -447,6 +730,7 @@ final class OrganizationProductCatalogService
 
         return [
             'pricing_version' => $organizationProduct->pricing_version,
+            'components_version' => $organizationProduct->components_version,
             'material_cost_micro_units' => $organizationProduct->material_cost_micro_units,
             'labor_cost_micro_units' => $organizationProduct->labor_cost_micro_units,
             'overhead_mode' => $organizationProduct->overhead_mode->value,

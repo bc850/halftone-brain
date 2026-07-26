@@ -70,6 +70,11 @@ class OrganizationProductPolicy
             && $this->tenant()->canOrg('catalog.org_product.manage');
     }
 
+    public function manageComponents(User $user, OrganizationProduct $organizationProduct): bool
+    {
+        return $this->updateSettings($user, $organizationProduct);
+    }
+
     public function updatePricing(User $user, OrganizationProduct $organizationProduct): bool
     {
         if (! $this->inTenant()) {
@@ -79,6 +84,11 @@ class OrganizationProductPolicy
         return $this->organizationProductInCurrentOrganization($organizationProduct)
             && $this->tenant()->canOrg('catalog.org_product.manage_pricing')
             && $this->tenant()->canViewCost();
+    }
+
+    public function updatePurchaseCost(User $user, OrganizationProduct $organizationProduct): bool
+    {
+        return $this->updatePricing($user, $organizationProduct);
     }
 
     public function previewPricing(User $user): bool

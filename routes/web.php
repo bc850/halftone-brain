@@ -76,8 +76,19 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
             ->name('products.edit-pricing');
         Route::patch('products/{organizationProduct}/pricing', [OrganizationProductController::class, 'updatePricing'])
             ->name('products.update-pricing');
+        Route::patch('products/{organizationProduct}/purchase-cost', [OrganizationProductController::class, 'updatePurchaseCost'])
+            ->name('products.update-purchase-cost');
         Route::post('products/{organizationProduct}/archive', [OrganizationProductController::class, 'archive'])
             ->name('products.archive');
+
+        Route::post('products/{organizationProduct}/components', [OrganizationProductController::class, 'storeComponent'])
+            ->name('products.components.store');
+        Route::patch('products/{organizationProduct}/components/{component}', [OrganizationProductController::class, 'updateComponent'])
+            ->name('products.components.update');
+        Route::post('products/{organizationProduct}/components/{component}/deactivate', [OrganizationProductController::class, 'deactivateComponent'])
+            ->name('products.components.deactivate');
+        Route::post('products/{organizationProduct}/components/{component}/reactivate', [OrganizationProductController::class, 'reactivateComponent'])
+            ->name('products.components.reactivate');
 
         Route::post('products/{organizationProduct}/conversions/preview', [OrganizationProductController::class, 'previewConversion'])
             ->name('products.conversions.preview');

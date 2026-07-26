@@ -241,11 +241,20 @@ test('cost fields are omitted without cost permission', function () {
 
 test('pricing preview performs no write and matches calculator', function () {
     $ctx = createTenantUser('owner', 'parent_owner');
+    $op = OrganizationProduct::factory()->create([
+        'parent_account_id' => $ctx['parent']->id,
+        'organization_id' => $ctx['organization']->id,
+        'pricing_version' => 1,
+        'components_version' => 1,
+    ]);
     $beforeAudits = AuditEvent::query()->count();
     $beforeProducts = Product::query()->count();
 
     $this->actingAs($ctx['user'])
         ->postJson(route('org.products.pricing-preview', $ctx['organization']), [
+            'organization_product_id' => $op->id,
+            'pricing_version' => 1,
+            'components_version' => 1,
             'material_cost' => '40',
             'labor_cost' => '30',
             'overhead_mode' => OverheadMode::Fixed->value,
@@ -256,11 +265,13 @@ test('pricing preview performs no write and matches calculator', function () {
         ])
         ->assertOk()
         ->assertJsonPath('unit_selling_price', '120.00')
-        ->assertJsonPath('extended_selling_price', '240.00');
+        ->assertJsonPath('extended_selling_price', '240.00')
+        ->assertJsonPath('material_source', 'manual');
 
     expect(AuditEvent::query()->count())->toBe($beforeAudits)
         ->and(Product::query()->count())->toBe($beforeProducts)
-        ->and(OrganizationProduct::query()->count())->toBe(0);
+        ->and($op->fresh()->pricing_version)->toBe(1)
+        ->and($op->fresh()->components_version)->toBe(1);
 });
 
 test('catalog pricing rejects calculated price below minimum', function () {

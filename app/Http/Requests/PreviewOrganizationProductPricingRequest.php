@@ -26,6 +26,9 @@ class PreviewOrganizationProductPricingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'organization_product_id' => ['required', 'integer'],
+            'pricing_version' => ['required', 'integer', 'min:1'],
+            'components_version' => ['required', 'integer', 'min:1'],
             'quantity' => ['nullable', 'regex:/^\d+(\.\d{1,'.PricingCalculator::QUANTITY_SCALE.'})?$/'],
             'material_cost' => ['required', 'regex:/^\d+(\.\d{1,4})?$/'],
             'labor_cost' => ['required', 'regex:/^\d+(\.\d{1,4})?$/'],
@@ -55,7 +58,9 @@ class PreviewOrganizationProductPricingRequest extends FormRequest
         $quantity = (string) ($validated['quantity'] ?? '1');
         $normalized = $this->normalizeOrganizationPricing($validated, requireCompletePricing: false);
         $normalized['quantity'] = $quantity === '' ? '1' : $quantity;
-        $normalized['pricing_version'] = 1;
+        $normalized['organization_product_id'] = (int) $validated['organization_product_id'];
+        $normalized['pricing_version'] = (int) $validated['pricing_version'];
+        $normalized['components_version'] = (int) $validated['components_version'];
 
         // Preview still runs calculator for response shape; minimum may warn without rejecting.
         return $normalized;
