@@ -12,6 +12,8 @@ use App\Models\OrganizationProductSource;
 use App\Models\OrganizationProductUnitConversion;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\Quote;
+use App\Models\QuoteRevision;
 use App\Models\Team;
 use App\Models\Vendor;
 use App\Models\VendorProductOffering;
@@ -126,6 +128,28 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return Deal::query()->whereKey($value)->firstOrFail();
+        });
+
+        Route::bind('quote', function (string $value): Quote {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            return Quote::query()
+                ->whereKey($value)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('quoteRevision', function (string $value): QuoteRevision {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            return QuoteRevision::query()
+                ->whereKey($value)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
         });
 
         Route::bind('team', function (string $value): Team {

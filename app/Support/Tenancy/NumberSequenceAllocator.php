@@ -15,10 +15,12 @@ final class NumberSequenceAllocator
 
     public const KEY_DEAL = 'deal';
 
+    public const KEY_QUOTE = 'quote';
+
     /**
      * @var list<string>
      */
-    public const ALLOWED_KEYS = [self::KEY_CUSTOMER, self::KEY_DEAL];
+    public const ALLOWED_KEYS = [self::KEY_CUSTOMER, self::KEY_DEAL, self::KEY_QUOTE];
 
     public function allocate(Organization $organization, string $sequenceKey, string $prefix = '', int $padLength = 5): string
     {

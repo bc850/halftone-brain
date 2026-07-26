@@ -15,6 +15,7 @@ use App\Models\Deal;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
 use App\Models\User;
+use App\Support\Deals\DealStageService;
 use App\Support\Money;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantRoute;
@@ -296,7 +297,7 @@ class DealController extends Controller
         return redirect()->to(TenantRoute::to('deals.index'));
     }
 
-    public function updateStage(Request $request, ?Organization $organization, Deal $deal): RedirectResponse
+    public function updateStage(Request $request, DealStageService $dealStages, ?Organization $organization, Deal $deal): RedirectResponse
     {
         $this->requireTenantContext();
         $this->authorize('update', $deal);
@@ -305,7 +306,12 @@ class DealController extends Controller
             'stage' => ['required', Rule::enum(DealStage::class)],
         ]);
 
-        $deal->update(['stage' => $validated['stage']]);
+        /** @var DealStage $stage */
+        $stage = $validated['stage'] instanceof DealStage
+            ? $validated['stage']
+            : DealStage::from((string) $validated['stage']);
+
+        $dealStages->applyManualStage($deal, $stage, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Deal stage updated.')]);
 

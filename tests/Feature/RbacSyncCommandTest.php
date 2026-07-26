@@ -42,14 +42,7 @@ function runRbacSync(array $options = [], bool $execute = false): PendingCommand
  */
 function seedPreOrgProductRbac(): void
 {
-    $excluded = [
-        'catalog.org_product.manage',
-        'catalog.org_product.manage_pricing',
-        'catalog.org_product.override_price',
-        'catalog.org_product.override_margin',
-        'catalog.org_product.approve_below_minimum',
-        'catalog.org_product.archive',
-    ];
+    $excluded = preOrgProductExcludedKeys();
 
     foreach (RbacDefinitions::permissions() as $permission) {
         if (in_array($permission['key'], $excluded, true)) {
@@ -82,6 +75,41 @@ function seedPreOrgProductRbac(): void
     }
 }
 
+/**
+ * @return list<string>
+ */
+function preOrgProductExcludedKeys(): array
+{
+    return [
+        'catalog.org_product.manage',
+        'catalog.org_product.manage_pricing',
+        'catalog.org_product.override_price',
+        'catalog.org_product.override_margin',
+        'catalog.org_product.approve_below_minimum',
+        'catalog.org_product.archive',
+    ];
+}
+
+function expectedPreOrgProductPermissionCount(): int
+{
+    return count(array_filter(
+        RbacDefinitions::permissions(),
+        fn (array $permission): bool => ! in_array($permission['key'], preOrgProductExcludedKeys(), true),
+    ));
+}
+
+function expectedPreOrgProductRolePermissionCount(): int
+{
+    $excluded = preOrgProductExcludedKeys();
+
+    return (int) collect(RbacDefinitions::systemRoles())->sum(
+        fn (array $role): int => count(array_filter(
+            $role['permissions'],
+            fn (string $key): bool => ! in_array($key, $excluded, true),
+        )),
+    );
+}
+
 function nonRbacCounts(): array
 {
     return [
@@ -100,9 +128,30 @@ function nonRbacCounts(): array
 test('dry run performs no writes and reports exact org product delta', function () {
     seedPreOrgProductRbac();
 
-    expect(Permission::query()->count())->toBe(56)
+    $excludedOrgProductKeys = [
+        'catalog.org_product.manage',
+        'catalog.org_product.manage_pricing',
+        'catalog.org_product.override_price',
+        'catalog.org_product.override_margin',
+        'catalog.org_product.approve_below_minimum',
+        'catalog.org_product.archive',
+    ];
+
+    $expectedPermissionCount = count(array_filter(
+        RbacDefinitions::permissions(),
+        fn (array $permission): bool => ! in_array($permission['key'], $excludedOrgProductKeys, true),
+    ));
+
+    $expectedRolePermissionCount = collect(RbacDefinitions::systemRoles())->sum(
+        fn (array $role): int => count(array_filter(
+            $role['permissions'],
+            fn (string $key): bool => ! in_array($key, $excludedOrgProductKeys, true),
+        )),
+    );
+
+    expect(Permission::query()->count())->toBe($expectedPermissionCount)
         ->and(Role::query()->count())->toBe(10)
-        ->and(DB::table('role_permission')->count())->toBe(180);
+        ->and(DB::table('role_permission')->count())->toBe($expectedRolePermissionCount);
 
     $before = nonRbacCounts();
     $plan = app(RbacSynchronizer::class)->buildPlan();
@@ -142,8 +191,8 @@ test('dry run performs no writes and reports exact org product delta', function 
         ->expectsOutputToContain('Role-permission grants to add (16):')
         ->expectsOutputToContain('No writes were performed');
 
-    expect(Permission::query()->count())->toBe(56)
-        ->and(DB::table('role_permission')->count())->toBe(180)
+    expect(Permission::query()->count())->toBe(expectedPreOrgProductPermissionCount())
+        ->and(DB::table('role_permission')->count())->toBe(expectedPreOrgProductRolePermissionCount())
         ->and(nonRbacCounts())->toBe($before);
 });
 
@@ -160,8 +209,8 @@ test('exact database confirmation is required and mismatch refuses before writes
     ])->assertFailed()
         ->expectsOutputToContain('does not match active database');
 
-    expect(Permission::query()->count())->toBe(56)
-        ->and(DB::table('role_permission')->count())->toBe(180);
+    expect(Permission::query()->count())->toBe(expectedPreOrgProductPermissionCount())
+        ->and(DB::table('role_permission')->count())->toBe(expectedPreOrgProductRolePermissionCount());
 });
 
 test('execute creates only missing RBAC definitions and grants', function () {
@@ -172,9 +221,9 @@ test('execute creates only missing RBAC definitions and grants', function () {
         ->assertSuccessful()
         ->expectsOutputToContain('created');
 
-    expect(Permission::query()->count())->toBe(62)
+    expect(Permission::query()->count())->toBe(count(RbacDefinitions::permissions()))
         ->and(Role::query()->count())->toBe(10)
-        ->and(DB::table('role_permission')->count())->toBe(196)
+        ->and(DB::table('role_permission')->count())->toBe(collect(RbacDefinitions::systemRoles())->sum(fn (array $role): int => count($role['permissions'])))
         ->and(nonRbacCounts())->toBe($before);
 
     $newKeys = [
@@ -317,15 +366,15 @@ test('induced failure rolls back all RBAC writes and releases lock', function ()
 
     runRbacSync(execute: true)->assertFailed();
 
-    expect(Permission::query()->count())->toBe(56)
-        ->and(DB::table('role_permission')->count())->toBe(180)
+    expect(Permission::query()->count())->toBe(expectedPreOrgProductPermissionCount())
+        ->and(DB::table('role_permission')->count())->toBe(expectedPreOrgProductRolePermissionCount())
         ->and(app(RbacSynchronizer::class)->isLockFree())->toBeTrue();
 
     app()->instance('rbacSync.induceFailure', false);
 
     runRbacSync(execute: true)->assertSuccessful();
 
-    expect(Permission::query()->count())->toBe(62)
+    expect(Permission::query()->count())->toBe(count(RbacDefinitions::permissions()))
         ->and(app(RbacSynchronizer::class)->isLockFree())->toBeTrue();
 });
 

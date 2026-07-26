@@ -33,6 +33,13 @@ final class RbacDefinitions
             ['key' => 'crm.deal.delete', 'module' => 'crm', 'description' => 'Delete deals'],
             ['key' => 'crm.deal.reassign', 'module' => 'crm', 'description' => 'Reassign deal ownership'],
 
+            // Organization CRM — quotes (Phase 2A)
+            ['key' => 'crm.quote.view', 'module' => 'crm', 'description' => 'View owned quotes'],
+            ['key' => 'crm.quote.view_all', 'module' => 'crm', 'description' => 'View all quotes in the organization'],
+            ['key' => 'crm.quote.create', 'module' => 'crm', 'description' => 'Create quotes'],
+            ['key' => 'crm.quote.update', 'module' => 'crm', 'description' => 'Update draft quotes and revisions'],
+            ['key' => 'crm.quote.void', 'module' => 'crm', 'description' => 'Void quotes'],
+
             // OrganizationCompany
             ['key' => 'crm.org_company.view', 'module' => 'crm', 'description' => 'View organization-company relationships'],
             ['key' => 'crm.org_company.create', 'module' => 'crm', 'description' => 'Associate companies with the organization'],
@@ -98,6 +105,7 @@ final class RbacDefinitions
             'crm.company.view', 'crm.company.view_all', 'crm.company.create', 'crm.company.update', 'crm.company.delete',
             'crm.contact.view', 'crm.contact.view_all', 'crm.contact.create', 'crm.contact.update', 'crm.contact.delete',
             'crm.deal.view', 'crm.deal.view_all', 'crm.deal.create', 'crm.deal.update', 'crm.deal.delete', 'crm.deal.reassign',
+            'crm.quote.view', 'crm.quote.view_all', 'crm.quote.create', 'crm.quote.update', 'crm.quote.void',
             'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update', 'crm.org_company.delete',
             'catalog.product.view', 'catalog.product.create', 'catalog.product.update', 'catalog.product.delete', 'catalog.product.view_cost',
             'catalog.org_product.manage', 'catalog.org_product.manage_pricing', 'catalog.org_product.override_price',
@@ -162,6 +170,7 @@ final class RbacDefinitions
                     'crm.company.view', 'crm.company.view_all', 'crm.company.create', 'crm.company.update',
                     'crm.contact.view', 'crm.contact.view_all', 'crm.contact.create', 'crm.contact.update',
                     'crm.deal.view', 'crm.deal.view_all', 'crm.deal.create', 'crm.deal.update', 'crm.deal.reassign',
+                    'crm.quote.view', 'crm.quote.view_all', 'crm.quote.create', 'crm.quote.update', 'crm.quote.void',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                     'catalog.org_product.override_price', 'catalog.org_product.override_margin',
@@ -176,6 +185,7 @@ final class RbacDefinitions
                     'crm.company.view', 'crm.company.create', 'crm.company.update',
                     'crm.contact.view', 'crm.contact.create', 'crm.contact.update',
                     'crm.deal.view', 'crm.deal.create', 'crm.deal.update',
+                    'crm.quote.view', 'crm.quote.create', 'crm.quote.update',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                 ],
@@ -186,6 +196,7 @@ final class RbacDefinitions
                 'permissions' => [
                     'crm.company.view', 'crm.contact.view',
                     'crm.deal.view', 'crm.deal.view_all', 'crm.deal.update',
+                    'crm.quote.view', 'crm.quote.view_all',
                     'crm.org_company.view',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                     'org.team.view',
@@ -196,6 +207,7 @@ final class RbacDefinitions
                 'scope' => 'system',
                 'permissions' => [
                     'crm.deal.view',
+                    'crm.quote.view',
                     'catalog.product.view',
                     'org.team.view',
                 ],
@@ -207,6 +219,7 @@ final class RbacDefinitions
                     'crm.company.view', 'crm.company.view_all',
                     'crm.contact.view', 'crm.contact.view_all',
                     'crm.deal.view', 'crm.deal.view_all',
+                    'crm.quote.view', 'crm.quote.view_all',
                     'crm.org_company.view',
                     'catalog.product.view', 'catalog.product.view_cost',
                     'catalog.org_product.manage_pricing',
