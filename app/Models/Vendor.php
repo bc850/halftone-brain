@@ -34,10 +34,22 @@ class Vendor extends Model
     }
 
     /**
+     * Legacy products that still point at this vendor via products.vendor_id.
+     *
      * @return HasMany<Product, $this>
      */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Parent-scoped vendor product offerings.
+     *
+     * @return HasMany<VendorProductOffering, $this>
+     */
+    public function vendorProductOfferings(): HasMany
+    {
+        return $this->hasMany(VendorProductOffering::class);
     }
 }

@@ -82,11 +82,26 @@ class Product extends Model
     }
 
     /**
+     * Legacy single-vendor pointer on the product master.
+     *
+     * Retained for dual-read until 1C.7D retirement. New sourcing uses
+     * {@see vendorProductOfferings()} and must not write vendor_id.
+     *
      * @return BelongsTo<Vendor, $this>
      */
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    /**
+     * Parent-scoped vendor offerings for this product master.
+     *
+     * @return HasMany<VendorProductOffering, $this>
+     */
+    public function vendorProductOfferings(): HasMany
+    {
+        return $this->hasMany(VendorProductOffering::class);
     }
 
     /**

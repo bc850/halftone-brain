@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Organization-specific availability and pricing inputs for a shared Product Master.
@@ -49,6 +50,7 @@ use Illuminate\Support\Carbon;
  * @property string $currency_code
  * @property int $pricing_version
  * @property int $components_version
+ * @property int|null $preferred_source_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -81,6 +83,7 @@ use Illuminate\Support\Carbon;
     'currency_code',
     'pricing_version',
     'components_version',
+    'preferred_source_id',
 ])]
 class OrganizationProduct extends Model
 {
@@ -93,6 +96,13 @@ class OrganizationProduct extends Model
     protected $attributes = [
         'components_version' => 1,
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (OrganizationProduct $organizationProduct): void {
+            $organizationProduct->assertPreferredSourceBelongsToThisProduct();
+        });
+    }
 
     /**
      * @return array<string, string>
@@ -122,6 +132,7 @@ class OrganizationProduct extends Model
             'allow_price_override' => 'boolean',
             'pricing_version' => 'integer',
             'components_version' => 'integer',
+            'preferred_source_id' => 'integer',
         ];
     }
 
@@ -178,6 +189,26 @@ class OrganizationProduct extends Model
     }
 
     /**
+     * Vendor offerings linked for purchasing this organization product.
+     *
+     * @return HasMany<OrganizationProductSource, $this>
+     */
+    public function sources(): HasMany
+    {
+        return $this->hasMany(OrganizationProductSource::class);
+    }
+
+    /**
+     * Preferred organization product source for purchasing (nullable).
+     *
+     * @return BelongsTo<OrganizationProductSource, $this>
+     */
+    public function preferredSource(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationProductSource::class, 'preferred_source_id');
+    }
+
+    /**
      * Map this record into immutable pricing facts for {@see PricingCalculator}.
      *
      * Does not consult Product Master legacy cost/price columns and performs no writes.
@@ -191,5 +222,33 @@ class OrganizationProduct extends Model
             $quantity,
             $requestedOverridePriceCents,
         );
+    }
+
+    /**
+     * Preferred source must belong to this exact OrganizationProduct (MySQL also
+     * enforces via composite FK; SQLite relies on this guard).
+     */
+    private function assertPreferredSourceBelongsToThisProduct(): void
+    {
+        if ($this->preferred_source_id === null) {
+            return;
+        }
+
+        if (! $this->exists) {
+            throw ValidationException::withMessages([
+                'preferred_source_id' => 'Preferred source requires a persisted organization product.',
+            ]);
+        }
+
+        $belongs = OrganizationProductSource::query()
+            ->whereKey($this->preferred_source_id)
+            ->where('organization_product_id', $this->id)
+            ->exists();
+
+        if (! $belongs) {
+            throw ValidationException::withMessages([
+                'preferred_source_id' => 'Preferred source must belong to this organization product.',
+            ]);
+        }
     }
 }
