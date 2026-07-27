@@ -335,21 +335,30 @@ test('phase 2a quote number sequence synchronizer creates missing sequences', fu
     $brim = Organization::factory()->create(['slug' => 'brim-drinkware']);
     Organization::factory()->create(['slug' => 'other-org']);
 
-    $results = app(QuoteNumberSequenceSynchronizer::class)->syncMissing();
+    $db = (string) config('database.connections.'.config('database.default').'.database');
+    $synchronizer = app(QuoteNumberSequenceSynchronizer::class);
 
-    expect($results)->toHaveCount(2)
-        ->and(collect($results)->pluck('slug')->sort()->values()->all())->toBe(['brim-drinkware', 'pelican-signs'])
-        ->and(collect($results)->every(fn (array $row): bool => $row['created'] === true))->toBeTrue();
+    $result = $synchronizer->run(false, $db);
+
+    expect($result['applied'])->toHaveCount(2)
+        ->and(collect($result['applied'])->pluck('organization_slug')->sort()->values()->all())
+        ->toBe(['brim-drinkware', 'pelican-signs']);
 
     expect(NumberSequence::query()
         ->where('organization_id', $pelican->id)
         ->where('sequence_key', NumberSequenceAllocator::KEY_QUOTE)
         ->where('prefix', QuoteNumberSequenceDefinitions::forOrganizationSlug('pelican-signs')['prefix'])
-        ->exists())->toBeTrue();
+        ->exists())->toBeTrue()
+        ->and(NumberSequence::query()
+            ->where('organization_id', $brim->id)
+            ->where('sequence_key', NumberSequenceAllocator::KEY_QUOTE)
+            ->exists())->toBeTrue();
 
-    $second = app(QuoteNumberSequenceSynchronizer::class)->syncMissing();
+    $second = $synchronizer->run(false, $db);
 
-    expect(collect($second)->every(fn (array $row): bool => $row['created'] === false))->toBeTrue();
+    expect($second['applied'])->toBe([])
+        ->and($second['plan']['sequences_to_create'])->toBe([])
+        ->and($second['plan']['unchanged_sequences'])->toHaveCount(2);
 });
 
 test('phase 2a quote policy allows own quote and view_all sees others', function () {
