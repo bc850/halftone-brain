@@ -14,6 +14,8 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quote;
 use App\Models\QuoteRevision;
+use App\Models\QuoteRevisionAdjustment;
+use App\Models\QuoteRevisionLineItem;
 use App\Models\Team;
 use App\Models\Vendor;
 use App\Models\VendorProductOffering;
@@ -148,6 +150,36 @@ class AppServiceProvider extends ServiceProvider
 
             return QuoteRevision::query()
                 ->whereKey($value)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('line', function (string $value, \Illuminate\Routing\Route $route): QuoteRevisionLineItem {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            /** @var QuoteRevision $quoteRevision */
+            $quoteRevision = $route->parameter('quoteRevision');
+
+            return QuoteRevisionLineItem::query()
+                ->whereKey($value)
+                ->where('quote_revision_id', $quoteRevision->id)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('adjustment', function (string $value, \Illuminate\Routing\Route $route): QuoteRevisionAdjustment {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            /** @var QuoteRevision $quoteRevision */
+            $quoteRevision = $route->parameter('quoteRevision');
+
+            return QuoteRevisionAdjustment::query()
+                ->whereKey($value)
+                ->where('quote_revision_id', $quoteRevision->id)
                 ->where('organization_id', TenantContext::get()->organizationId)
                 ->firstOrFail();
         });

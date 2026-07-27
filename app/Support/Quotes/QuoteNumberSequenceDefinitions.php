@@ -35,4 +35,26 @@ final class QuoteNumberSequenceDefinitions
     {
         return self::byOrganizationSlug()[$slug] ?? null;
     }
+
+    /**
+     * Approved prefix for an organization, falling back to a deterministic prefix
+     * derived from the slug for organizations without a curated definition.
+     */
+    public static function prefixForOrganizationSlug(string $slug): string
+    {
+        $definition = self::forOrganizationSlug($slug);
+
+        if ($definition !== null) {
+            return $definition['prefix'];
+        }
+
+        $head = (string) preg_replace('/[^A-Za-z0-9]/', '', explode('-', $slug)[0]);
+
+        return strtoupper(substr($head === '' ? 'ORG' : $head, 0, 4)).'-Q-';
+    }
+
+    public static function padLengthForOrganizationSlug(string $slug): int
+    {
+        return self::forOrganizationSlug($slug)['pad_length'] ?? self::PAD_LENGTH;
+    }
 }

@@ -125,8 +125,9 @@ test('phase 2b1 party snapshot is one per revision and tax defaults pending', fu
     $revision = $quote->currentRevision;
     expect($revision->tax_calculation_status)->toBe(QuoteTaxCalculationStatus::Pending);
 
-    $snapshot = QuoteRevisionPartySnapshotFactory::createForRevision($revision);
-    expect($snapshot->quote_revision_id)->toBe($revision->id)
+    $snapshot = $revision->partySnapshot;
+    expect($snapshot)->not->toBeNull()
+        ->and($snapshot->quote_revision_id)->toBe($revision->id)
         ->and($revision->fresh()->partySnapshot?->id)->toBe($snapshot->id);
 
     expect(fn () => QuoteRevisionPartySnapshotFactory::createForRevision($revision))
@@ -164,7 +165,6 @@ test('phase 2b1 line and adjustment tenant isolation and position uniqueness', f
 test('phase 2b1 sent revision children are immutable', function () {
     $quote = QuoteFactory::createForDeal();
     $revision = $quote->currentRevision;
-    QuoteRevisionPartySnapshotFactory::createForRevision($revision);
     $line = QuoteRevisionLineItem::factory()->create([
         'quote_revision_id' => $revision->id,
         'position' => 1,

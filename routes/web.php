@@ -7,6 +7,12 @@ use App\Http\Controllers\OrganizationProductController;
 use App\Http\Controllers\OrganizationProductSourceController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\QuotePartySnapshotController;
+use App\Http\Controllers\QuoteRepriceController;
+use App\Http\Controllers\QuoteRevisionAdjustmentController;
+use App\Http\Controllers\QuoteRevisionController;
+use App\Http\Controllers\QuoteRevisionLineController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VendorProductOfferingController;
 use App\Http\Controllers\VisibilityPreferenceController;
@@ -50,6 +56,54 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
         Route::resource('contacts', ContactController::class);
         Route::resource('deals', DealController::class);
         Route::patch('deals/{deal}/stage', [DealController::class, 'updateStage'])->name('deals.stage');
+
+        /*
+         | Quotes are tenant-only: there is no legacy `/quotes` surface to fall back to.
+         */
+        Route::get('deals/{deal}/quotes', [QuoteController::class, 'indexForDeal'])
+            ->name('deals.quotes.index');
+        Route::get('deals/{deal}/quotes/create', [QuoteController::class, 'create'])
+            ->name('deals.quotes.create');
+        Route::post('deals/{deal}/quotes', [QuoteController::class, 'store'])
+            ->name('deals.quotes.store');
+
+        Route::get('quotes/{quote}', [QuoteController::class, 'show'])
+            ->name('quotes.show');
+
+        Route::prefix('quotes/{quote}/revisions/{quoteRevision}')
+            ->name('quotes.revisions.')
+            ->group(function (): void {
+                Route::get('/', [QuoteRevisionController::class, 'show'])->name('show');
+                Route::get('edit', [QuoteRevisionController::class, 'edit'])->name('edit');
+                Route::patch('content', [QuoteRevisionController::class, 'updateContent'])->name('content');
+                Route::post('clone', [QuoteRevisionController::class, 'clone'])->name('clone');
+
+                Route::get('party/edit', [QuotePartySnapshotController::class, 'edit'])->name('party.edit');
+                Route::patch('party', [QuotePartySnapshotController::class, 'update'])->name('party.update');
+                Route::post('party/refresh-preview', [QuotePartySnapshotController::class, 'refreshPreview'])
+                    ->name('party.refresh-preview');
+                Route::post('party/refresh', [QuotePartySnapshotController::class, 'refresh'])
+                    ->name('party.refresh');
+
+                Route::post('lines/catalog', [QuoteRevisionLineController::class, 'storeCatalog'])->name('lines.catalog');
+                Route::post('lines/custom', [QuoteRevisionLineController::class, 'storeCustom'])->name('lines.custom');
+                Route::post('lines/section', [QuoteRevisionLineController::class, 'storeSection'])->name('lines.section');
+                Route::post('lines/note', [QuoteRevisionLineController::class, 'storeNote'])->name('lines.note');
+                Route::post('lines/reorder', [QuoteRevisionLineController::class, 'reorder'])->name('lines.reorder');
+                Route::patch('lines/{line}', [QuoteRevisionLineController::class, 'update'])->name('lines.update');
+                Route::delete('lines/{line}', [QuoteRevisionLineController::class, 'destroy'])->name('lines.destroy');
+
+                Route::post('lines/{line}/reprice', [QuoteRepriceController::class, 'repriceLine'])->name('lines.reprice');
+                Route::post('lines/{line}/reset-override', [QuoteRepriceController::class, 'resetOverride'])
+                    ->name('lines.reset-override');
+                Route::post('reprice-catalog', [QuoteRepriceController::class, 'repriceCatalog'])->name('reprice-catalog');
+
+                Route::post('adjustments', [QuoteRevisionAdjustmentController::class, 'store'])->name('adjustments.store');
+                Route::patch('adjustments/{adjustment}', [QuoteRevisionAdjustmentController::class, 'update'])
+                    ->name('adjustments.update');
+                Route::delete('adjustments/{adjustment}', [QuoteRevisionAdjustmentController::class, 'destroy'])
+                    ->name('adjustments.destroy');
+            });
 
         Route::resource('vendors', VendorController::class);
 

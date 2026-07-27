@@ -3,7 +3,10 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
-import { useTenantRoute } from '@/composables/useTenantAction';
+import {
+    useOrganizationSlug,
+    useTenantRoute,
+} from '@/composables/useTenantAction';
 import { dashboard } from '@/routes';
 import { show as legacyShowCompany } from '@/routes/companies';
 import { show as legacyShowContact } from '@/routes/contacts';
@@ -20,6 +23,12 @@ import {
     edit as orgEdit,
     stage as orgStage,
 } from '@/routes/org/deals';
+import {
+    create as createQuote,
+    index as quoteIndex,
+} from '@/routes/org/deals/quotes';
+import { show as showQuote } from '@/routes/org/quotes';
+import type { QuoteSummary } from '@/types';
 
 const destroy = useTenantRoute(legacyDestroy, orgDestroy);
 const edit = useTenantRoute(legacyEdit, orgEdit);
@@ -59,7 +68,12 @@ type Deal = {
 const props = defineProps<{
     deal: Deal;
     stages: StageOption[];
+    quotes: QuoteSummary[];
+    canViewQuotes: boolean;
+    canCreateQuote: boolean;
 }>();
+
+const organizationSlug = useOrganizationSlug();
 
 const fieldClass =
     'border-input bg-transparent dark:bg-input/30 h-9 rounded-md border px-3 py-1 text-sm outline-none';
@@ -221,6 +235,67 @@ defineOptions({
                 </ul>
             </section>
         </div>
+
+        <section
+            v-if="props.canViewQuotes && organizationSlug"
+            class="space-y-3 rounded-xl border p-4 text-sm"
+        >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="font-medium">Quotes</h2>
+                <div class="flex gap-2">
+                    <Button variant="ghost" size="sm" as-child>
+                        <Link :href="quoteIndex([organizationSlug, deal.id])">
+                            View all
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="props.canCreateQuote"
+                        variant="outline"
+                        size="sm"
+                        as-child
+                    >
+                        <Link :href="createQuote([organizationSlug, deal.id])">
+                            New quote
+                        </Link>
+                    </Button>
+                </div>
+            </div>
+            <ul class="divide-y">
+                <li
+                    v-for="quote in props.quotes"
+                    :key="quote.id"
+                    class="flex flex-wrap items-center justify-between gap-2 py-2"
+                >
+                    <Link
+                        class="font-medium hover:underline"
+                        :href="showQuote([organizationSlug, quote.id])"
+                    >
+                        {{ quote.quote_number }}
+                    </Link>
+                    <div class="flex items-center gap-3 text-muted-foreground">
+                        <span>
+                            {{ quote.current_revision?.status ?? '—' }}
+                        </span>
+                        <span v-if="quote.current_revision?.tax_pending">
+                            Tax pending
+                        </span>
+                        <span class="text-foreground">
+                            {{
+                                quote.current_revision
+                                    ? `$${quote.current_revision.pretax_total} pre-tax`
+                                    : '—'
+                            }}
+                        </span>
+                    </div>
+                </li>
+                <li
+                    v-if="props.quotes.length === 0"
+                    class="py-3 text-muted-foreground"
+                >
+                    No quotes on this deal yet.
+                </li>
+            </ul>
+        </section>
 
         <Button
             v-if="deal.can_delete"

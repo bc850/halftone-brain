@@ -9,11 +9,13 @@ use App\Http\Controllers\Concerns\ScopesQueriesToTenant;
 use App\Http\Requests\StoreDealRequest;
 use App\Http\Requests\UpdateDealRequest;
 use App\Http\Resources\DealResource;
+use App\Http\Resources\QuoteResource;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
+use App\Models\Quote;
 use App\Models\User;
 use App\Support\Deals\DealStageService;
 use App\Support\Money;
@@ -212,12 +214,22 @@ class DealController extends Controller
             'contacts:id,first_name,last_name,email,phone',
         ]);
 
+        $canViewQuotes = $user->can('viewAny', Quote::class);
+
         return Inertia::render('deals/Show', [
             'deal' => DealResource::make($deal, $user),
             'stages' => collect(DealStage::pipelineOrder())->map(fn (DealStage $stage): array => [
                 'value' => $stage->value,
                 'label' => $stage->label(),
             ]),
+            'quotes' => $canViewQuotes
+                ? QuoteResource::collection(
+                    QuoteController::quotesForDeal($deal)->filter(fn (Quote $quote): bool => $user->can('view', $quote)),
+                    $user,
+                )
+                : [],
+            'canViewQuotes' => $canViewQuotes,
+            'canCreateQuote' => $user->can('create', Quote::class) && $deal->organization_company_id !== null,
         ]);
     }
 

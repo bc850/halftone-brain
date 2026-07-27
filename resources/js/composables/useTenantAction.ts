@@ -14,6 +14,14 @@ function organizationSlug(): string | undefined {
 }
 
 /**
+ * Slug of the active organization. Tenant-only pages (quotes) build org route
+ * arguments from it directly instead of pairing with a legacy route.
+ */
+export function useOrganizationSlug(): string {
+    return organizationSlug() ?? '';
+}
+
+/**
  * Adapt legacy Wayfinder call args into org-prefixed route args.
  * Legacy: show(1) / show({ company: 1 })
  * Org: show([slug, 1]) / show({ organization: slug, company: 1 })

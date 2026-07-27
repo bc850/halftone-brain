@@ -4,6 +4,7 @@ namespace App\Support\Quotes;
 
 use App\Enums\QuoteRevisionStatus;
 use App\Enums\QuoteStatusTransitionSource;
+use App\Enums\QuoteTaxCalculationStatus;
 use App\Models\Organization;
 use App\Models\ParentAccount;
 use App\Models\Quote;
@@ -16,11 +17,15 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
- * Clone an eligible revision into a new draft. Line cloning hooks in for 2B.
+ * Clone an eligible revision into a new draft, including its party snapshot, lines,
+ * and adjustments. `$afterCreate` runs after children are copied for extra hooks.
  */
 final class QuoteRevisionCloner
 {
-    public function __construct(private Auditor $auditor) {}
+    public function __construct(
+        private Auditor $auditor,
+        private QuoteRevisionChildrenCloner $children,
+    ) {}
 
     /**
      * @param  callable(QuoteRevision $newRevision, QuoteRevision $source): void|null  $afterCreate
@@ -100,6 +105,10 @@ final class QuoteRevisionCloner
                     'taxable_amount_cents' => $lockedSource->taxable_amount_cents,
                     'tax_cents' => $lockedSource->tax_cents,
                     'grand_total_cents' => $lockedSource->grand_total_cents,
+                    // Tax is unresolved on every new draft; the source snapshot never carries over.
+                    'tax_calculation_status' => QuoteTaxCalculationStatus::Pending,
+                    'tax_snapshot_json' => null,
+                    'tax_calculated_at' => null,
                     'requested_deposit_cents' => $lockedSource->requested_deposit_cents,
                     'approval_required' => false,
                     'approval_reason_snapshot' => null,
@@ -121,6 +130,8 @@ final class QuoteRevisionCloner
                 QuoteRevision::$allowLifecycleMutation = false;
                 Quote::$allowLifecycleMutation = false;
             }
+
+            $this->children->copy($lockedSource, $newRevision);
 
             if ($afterCreate !== null) {
                 $afterCreate($newRevision, $lockedSource);
