@@ -71,6 +71,14 @@ function phase2aRollback(): void
     if (Schema::getConnection()->getDriverName() === 'sqlite') {
         // SQLite cannot drop named foreign keys from migration 212404.
         Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('quote_revision_adjustments');
+        Schema::dropIfExists('quote_revision_line_items');
+        Schema::dropIfExists('quote_revision_party_snapshots');
+        if (Schema::hasColumn('quote_revisions', 'tax_calculation_status')) {
+            Schema::table('quote_revisions', function (Blueprint $table): void {
+                $table->dropColumn(['tax_calculation_status', 'tax_snapshot_json', 'tax_calculated_at']);
+            });
+        }
         Schema::dropIfExists('quote_status_events');
         Schema::dropIfExists('quote_revisions');
         Schema::dropIfExists('quotes');
@@ -88,12 +96,18 @@ function phase2aRollback(): void
             });
         }
 
-        DB::table('migrations')->whereIn('migration', PHASE_2A_MIGRATIONS)->delete();
+        DB::table('migrations')->whereIn('migration', [
+            ...PHASE_2A_MIGRATIONS,
+            '2026_07_27_020721_create_quote_revision_party_snapshots_table',
+            '2026_07_27_020722_create_quote_revision_line_items_table',
+            '2026_07_27_020723_create_quote_revision_adjustments_table',
+            '2026_07_27_020724_add_tax_readiness_columns_to_quote_revisions_table',
+        ])->delete();
 
         return;
     }
 
-    Artisan::call('migrate:rollback', ['--step' => 4, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 8, '--force' => true]);
 }
 
 function phase2aRemigrate(): void

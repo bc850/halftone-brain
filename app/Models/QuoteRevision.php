@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\QuoteRevisionStatus;
+use App\Enums\QuoteTaxCalculationStatus;
 use App\Support\Quotes\ImmutableQuoteRevisionException;
 use Database\Factories\QuoteRevisionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -35,6 +37,9 @@ use Illuminate\Support\Carbon;
  * @property int $taxable_amount_cents
  * @property int $tax_cents
  * @property int $grand_total_cents
+ * @property QuoteTaxCalculationStatus $tax_calculation_status
+ * @property array<string, mixed>|null $tax_snapshot_json
+ * @property Carbon|null $tax_calculated_at
  * @property int|null $requested_deposit_cents
  * @property bool $approval_required
  * @property array<string, mixed>|null $approval_reason_snapshot
@@ -69,6 +74,9 @@ use Illuminate\Support\Carbon;
     'taxable_amount_cents',
     'tax_cents',
     'grand_total_cents',
+    'tax_calculation_status',
+    'tax_snapshot_json',
+    'tax_calculated_at',
     'requested_deposit_cents',
     'approval_required',
     'approval_reason_snapshot',
@@ -106,6 +114,9 @@ class QuoteRevision extends Model
         'taxable_amount_cents',
         'tax_cents',
         'grand_total_cents',
+        'tax_calculation_status',
+        'tax_snapshot_json',
+        'tax_calculated_at',
         'requested_deposit_cents',
         'approval_required',
         'approval_reason_snapshot',
@@ -145,6 +156,7 @@ class QuoteRevision extends Model
         'taxable_amount_cents' => 0,
         'tax_cents' => 0,
         'grand_total_cents' => 0,
+        'tax_calculation_status' => 'pending',
         'approval_required' => false,
     ];
 
@@ -203,6 +215,9 @@ class QuoteRevision extends Model
             'taxable_amount_cents' => 'integer',
             'tax_cents' => 'integer',
             'grand_total_cents' => 'integer',
+            'tax_calculation_status' => QuoteTaxCalculationStatus::class,
+            'tax_snapshot_json' => 'array',
+            'tax_calculated_at' => 'datetime',
             'requested_deposit_cents' => 'integer',
             'approval_required' => 'boolean',
             'approval_reason_snapshot' => 'array',
@@ -239,6 +254,30 @@ class QuoteRevision extends Model
     public function statusEvents(): HasMany
     {
         return $this->hasMany(QuoteStatusEvent::class);
+    }
+
+    /**
+     * @return HasMany<QuoteRevisionLineItem, $this>
+     */
+    public function lineItems(): HasMany
+    {
+        return $this->hasMany(QuoteRevisionLineItem::class)->orderBy('position');
+    }
+
+    /**
+     * @return HasMany<QuoteRevisionAdjustment, $this>
+     */
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(QuoteRevisionAdjustment::class)->orderBy('position');
+    }
+
+    /**
+     * @return HasOne<QuoteRevisionPartySnapshot, $this>
+     */
+    public function partySnapshot(): HasOne
+    {
+        return $this->hasOne(QuoteRevisionPartySnapshot::class);
     }
 
     /**
