@@ -6,6 +6,9 @@ use App\Enums\QuoteTaxCalculationStatus;
 
 /**
  * Immutable quote totals result. Tax remains unresolved in 2B.1.
+ *
+ * meetsApprovalThreshold is true only when final pretax amount is
+ * strictly greater than QuoteTotalsCalculator::APPROVAL_THRESHOLD_CENTS.
  */
 final readonly class QuoteTotalsResult
 {

@@ -22,7 +22,10 @@ final class QuoteTotalsCalculator
 
     public const QUANTITY_SCALE_FACTOR = ComponentCostEstimator::QUANTITY_SCALE_FACTOR;
 
-    /** Approval threshold basis: $1,500.00 pre-tax. */
+    /**
+     * Approval threshold boundary in cents ($1,500.00).
+     * Approval is required when final pre-tax amount is strictly greater than this value.
+     */
     public const APPROVAL_THRESHOLD_CENTS = 150_000;
 
     public const MAX_BASIS_POINTS = Money::BASIS_POINTS_PER_UNIT;
@@ -113,7 +116,7 @@ final class QuoteTotalsCalculator
             adjustments: $adjustmentResults,
             taxStatus: QuoteTaxCalculationStatus::Pending,
             taxUnresolved: true,
-            meetsApprovalThreshold: $finalPretax >= self::APPROVAL_THRESHOLD_CENTS,
+            meetsApprovalThreshold: $finalPretax > self::APPROVAL_THRESHOLD_CENTS,
         );
     }
 

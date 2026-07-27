@@ -186,17 +186,82 @@ test('quote discounts fees shipping installation and threshold', function () {
         ->and($result->meetsApprovalThreshold)->toBeFalse()
         ->and($result->taxUnresolved)->toBeTrue()
         ->and($result->taxStatus)->toBe(QuoteTaxCalculationStatus::Pending);
+});
+
+test('approval threshold requires final pretax strictly greater than $1500', function () {
+    $calculator = new QuoteTotalsCalculator;
+    $threshold = QuoteTotalsCalculator::APPROVAL_THRESHOLD_CENTS;
+
+    $oneCentBelow = $calculator->calculate([
+        quoteLineInput(['finalUnitPriceCents' => $threshold - 1]),
+    ]);
+    expect($oneCentBelow->finalPretaxAmountCents)->toBe(149_999)
+        ->and($oneCentBelow->approvalThresholdBasisCents)->toBe(149_999)
+        ->and($oneCentBelow->meetsApprovalThreshold)->toBeFalse();
+
+    $exactlyThreshold = $calculator->calculate([
+        quoteLineInput(['finalUnitPriceCents' => $threshold]),
+    ]);
+    expect($exactlyThreshold->finalPretaxAmountCents)->toBe(150_000)
+        ->and($exactlyThreshold->approvalThresholdBasisCents)->toBe(150_000)
+        ->and($exactlyThreshold->meetsApprovalThreshold)->toBeFalse();
+
+    $oneCentAbove = $calculator->calculate([
+        quoteLineInput(['finalUnitPriceCents' => $threshold + 1]),
+    ]);
+    expect($oneCentAbove->finalPretaxAmountCents)->toBe(150_001)
+        ->and($oneCentAbove->approvalThresholdBasisCents)->toBe(150_001)
+        ->and($oneCentAbove->meetsApprovalThreshold)->toBeTrue();
+});
+
+test('fees can push a quote from exactly $1500 to above the approval threshold', function () {
+    $calculator = new QuoteTotalsCalculator;
+    $threshold = QuoteTotalsCalculator::APPROVAL_THRESHOLD_CENTS;
 
     $atThreshold = $calculator->calculate([
-        quoteLineInput(['finalUnitPriceCents' => QuoteTotalsCalculator::APPROVAL_THRESHOLD_CENTS]),
+        quoteLineInput(['finalUnitPriceCents' => $threshold]),
     ]);
-    expect($atThreshold->meetsApprovalThreshold)->toBeTrue()
-        ->and($atThreshold->finalPretaxAmountCents)->toBe(150_000);
+    expect($atThreshold->finalPretaxAmountCents)->toBe(150_000)
+        ->and($atThreshold->meetsApprovalThreshold)->toBeFalse();
+
+    $withFee = $calculator->calculate(
+        [quoteLineInput(['finalUnitPriceCents' => $threshold])],
+        [quoteAdjustmentInput([
+            'key' => 'fee-push',
+            'adjustmentType' => QuoteAdjustmentType::Fee,
+            'inputValue' => 1,
+            'isTaxable' => false,
+        ])],
+    );
+    expect($withFee->finalPretaxAmountCents)->toBe(150_001)
+        ->and($withFee->positiveAdjustmentTotalsByType['fee'])->toBe(1)
+        ->and($withFee->approvalThresholdBasisCents)->toBe(150_001)
+        ->and($withFee->meetsApprovalThreshold)->toBeTrue();
+});
+
+test('quote discount can bring an above-threshold quote down to exactly $1500', function () {
+    $calculator = new QuoteTotalsCalculator;
+    $threshold = QuoteTotalsCalculator::APPROVAL_THRESHOLD_CENTS;
 
     $above = $calculator->calculate([
-        quoteLineInput(['finalUnitPriceCents' => QuoteTotalsCalculator::APPROVAL_THRESHOLD_CENTS + 1]),
+        quoteLineInput(['finalUnitPriceCents' => $threshold + 500]),
     ]);
-    expect($above->meetsApprovalThreshold)->toBeTrue();
+    expect($above->finalPretaxAmountCents)->toBe(150_500)
+        ->and($above->meetsApprovalThreshold)->toBeTrue();
+
+    $discountedToExact = $calculator->calculate(
+        [quoteLineInput(['finalUnitPriceCents' => $threshold + 500])],
+        [quoteAdjustmentInput([
+            'key' => 'discount-to-threshold',
+            'adjustmentType' => QuoteAdjustmentType::QuoteDiscount,
+            'method' => QuoteAdjustmentMethod::Fixed,
+            'inputValue' => 500,
+        ])],
+    );
+    expect($discountedToExact->finalPretaxAmountCents)->toBe(150_000)
+        ->and($discountedToExact->quoteDiscountTotalCents)->toBe(500)
+        ->and($discountedToExact->approvalThresholdBasisCents)->toBe(150_000)
+        ->and($discountedToExact->meetsApprovalThreshold)->toBeFalse();
 });
 
 test('section and note lines contribute zero', function () {
