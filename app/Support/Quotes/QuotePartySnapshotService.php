@@ -67,9 +67,25 @@ final class QuotePartySnapshotService
         'expiration_date',
     ];
 
+    /**
+     * Revision content a customer reads on the document. Editing any of these means the
+     * quote a reviewer approved is no longer the quote that would go out, so approval and
+     * the tax position that was resolved against it are invalidated. `internal_notes` is
+     * absent on purpose: it never reaches the customer and never changes the numbers.
+     *
+     * @var list<string>
+     */
+    private const CUSTOMER_VISIBLE_REVISION_FIELDS = [
+        'introduction',
+        'terms_text',
+        'customer_notes',
+        'expiration_date',
+    ];
+
     public function __construct(
         private QuoteDraftLock $lock,
         private QuotePartySnapshotBuilder $builder,
+        private QuoteApprovalInvalidationService $invalidation,
         private Auditor $auditor,
     ) {}
 
@@ -150,6 +166,17 @@ final class QuotePartySnapshotService
             ]);
             $snapshot->save();
 
+            $correlationId = (string) Str::uuid();
+
+            // Addresses and customer identity decide the jurisdiction and the approval
+            // context, so a refresh invalidates both. The bump below is the only one.
+            $this->invalidation->invalidateForFinancialMutation(
+                $lockedQuote,
+                $lockedRevision,
+                $actor,
+                $correlationId,
+            );
+
             $this->lock->bumpRevisionLock($lockedRevision);
 
             $this->audit(
@@ -159,6 +186,7 @@ final class QuotePartySnapshotService
                 $before,
                 $this->payload($snapshot),
                 $actor,
+                $correlationId,
             );
 
             return $snapshot->fresh() ?? $snapshot;
@@ -209,6 +237,17 @@ final class QuotePartySnapshotService
 
             $snapshot->save();
 
+            $correlationId = (string) Str::uuid();
+
+            // Contact details and addresses are the sourcing inputs for tax and the
+            // customer identity an approver reviewed, so both are invalidated here.
+            $this->invalidation->invalidateForFinancialMutation(
+                $lockedQuote,
+                $lockedRevision,
+                $actor,
+                $correlationId,
+            );
+
             $this->lock->bumpRevisionLock($lockedRevision);
 
             $this->audit(
@@ -218,6 +257,7 @@ final class QuotePartySnapshotService
                 $before,
                 $this->payload($snapshot),
                 $actor,
+                $correlationId,
             );
 
             return $snapshot->fresh() ?? $snapshot;
@@ -259,7 +299,23 @@ final class QuotePartySnapshotService
                 }
             }
 
+            $customerVisibleChange = array_intersect(
+                array_keys($lockedRevision->getDirty()),
+                self::CUSTOMER_VISIBLE_REVISION_FIELDS,
+            ) !== [];
+
             $lockedRevision->save();
+
+            $correlationId = (string) Str::uuid();
+
+            if ($customerVisibleChange) {
+                $this->invalidation->invalidateForFinancialMutation(
+                    $lockedQuote,
+                    $lockedRevision,
+                    $actor,
+                    $correlationId,
+                );
+            }
 
             $this->lock->bumpRevisionLock($lockedRevision);
 
@@ -272,7 +328,7 @@ final class QuotePartySnapshotService
                 actor: $actor,
                 before: $before,
                 after: $this->revisionPayload($lockedRevision),
-                correlationId: (string) Str::uuid(),
+                correlationId: $correlationId,
             );
 
             return $lockedRevision->fresh() ?? $lockedRevision;
@@ -378,6 +434,7 @@ final class QuotePartySnapshotService
         array $before,
         array $after,
         ?User $actor,
+        string $correlationId,
     ): void {
         $this->auditor->append(
             parentAccount: ParentAccount::query()->findOrFail($quote->parent_account_id),
@@ -388,7 +445,7 @@ final class QuotePartySnapshotService
             actor: $actor,
             before: $before,
             after: $after,
-            correlationId: (string) Str::uuid(),
+            correlationId: $correlationId,
         );
     }
 

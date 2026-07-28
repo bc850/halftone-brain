@@ -103,12 +103,16 @@ final class QuoteRevisionCloner
                     'subtotal_cents' => $lockedSource->subtotal_cents,
                     'discount_cents' => $lockedSource->discount_cents,
                     'taxable_amount_cents' => $lockedSource->taxable_amount_cents,
-                    'tax_cents' => $lockedSource->tax_cents,
-                    'grand_total_cents' => $lockedSource->grand_total_cents,
-                    // Tax is unresolved on every new draft; the source snapshot never carries over.
+                    // Tax is unresolved on every new draft, so the clone starts pretax:
+                    // the source snapshot, its calculation pointer, and the tax the source
+                    // grand total was carrying never come across.
+                    'tax_cents' => 0,
+                    'grand_total_cents' => $lockedSource->grand_total_cents - $lockedSource->tax_cents,
                     'tax_calculation_status' => QuoteTaxCalculationStatus::Pending,
                     'tax_snapshot_json' => null,
                     'tax_calculated_at' => null,
+                    'current_tax_calculation_id' => null,
+                    'current_approval_request_id' => null,
                     'requested_deposit_cents' => $lockedSource->requested_deposit_cents,
                     'approval_required' => false,
                     'approval_reason_snapshot' => null,

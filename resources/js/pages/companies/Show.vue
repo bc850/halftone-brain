@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Pencil, Plus } from '@lucide/vue';
+import { Pencil, Plus, Stamp } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { useTenantRoute } from '@/composables/useTenantAction';
@@ -76,6 +76,8 @@ type Company = {
 const props = defineProps<{
     company: Company;
     canCreateDeal: boolean;
+    taxCertificatesUrl?: string | null;
+    canViewTaxCertificates?: boolean;
 }>();
 
 function formatAddress(
@@ -126,6 +128,18 @@ defineOptions({
                     <Link :href="edit(company.id)">
                         <Pencil class="size-4" />
                         Edit
+                    </Link>
+                </Button>
+                <Button
+                    v-if="
+                        props.canViewTaxCertificates && props.taxCertificatesUrl
+                    "
+                    variant="outline"
+                    as-child
+                >
+                    <Link :href="props.taxCertificatesUrl">
+                        <Stamp class="size-4" />
+                        Tax certificates
                     </Link>
                 </Button>
                 <Button variant="outline" as-child>

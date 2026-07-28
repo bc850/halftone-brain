@@ -52,8 +52,8 @@ final class QuoteRevisionResource
             'currency_code' => $revision->currency_code,
             'issue_date' => $revision->issue_date?->toDateString(),
             'expiration_date' => $revision->expiration_date?->toDateString(),
-            'pretax_total' => self::dollars($revision->grand_total_cents),
-            'pretax_total_cents' => $revision->grand_total_cents,
+            'pretax_total' => self::dollars($revision->grand_total_cents - $revision->tax_cents),
+            'pretax_total_cents' => $revision->grand_total_cents - $revision->tax_cents,
             'approval_required' => $revision->approval_required,
             ...self::taxFlags($revision),
             'created_at' => $revision->created_at?->toIso8601String(),
@@ -104,7 +104,13 @@ final class QuoteRevisionResource
             'tax_calculation_status' => $revision->tax_calculation_status->value,
             'tax_unresolved' => $unresolved,
             'tax_pending' => $revision->tax_calculation_status->blocksCustomerFinalization(),
-            'totals_are_pretax' => true,
+            // Every total on a revision stays pre-tax until the engine resolves a
+            // position, so a grand total is only meaningful once it has.
+            'totals_are_pretax' => $unresolved,
+            'tax' => self::dollars($revision->tax_cents),
+            'tax_cents' => $revision->tax_cents,
+            'grand_total' => $unresolved ? null : self::dollars($revision->grand_total_cents),
+            'grand_total_cents' => $unresolved ? null : $revision->grand_total_cents,
             'tax_message' => $unresolved ? self::TAX_PENDING_MESSAGE : null,
         ];
     }

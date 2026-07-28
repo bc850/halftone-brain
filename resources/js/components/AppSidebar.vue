@@ -5,6 +5,8 @@ import {
     Handshake,
     LayoutGrid,
     Package,
+    Percent,
+    Stamp,
     Tags,
     Truck,
     Users,
@@ -35,6 +37,8 @@ import { index as orgCompaniesIndex } from '@/routes/org/companies';
 import { index as orgContactsIndex } from '@/routes/org/contacts';
 import { index as orgDealsIndex } from '@/routes/org/deals';
 import { index as orgProductsIndex } from '@/routes/org/products';
+import { index as orgApprovalQueueIndex } from '@/routes/org/quote-approvals';
+import { edit as orgTaxSettingsEdit } from '@/routes/org/tax-settings';
 import { index as orgVendorsIndex } from '@/routes/org/vendors';
 import { index as legacyProductsIndex } from '@/routes/products';
 import { index as legacyVendorsIndex } from '@/routes/vendors';
@@ -44,6 +48,14 @@ const page = usePage();
 const organizationSlug = computed(
     () => page.props.tenant?.organization?.slug ?? null,
 );
+
+const permissions = computed(() => page.props.tenant?.permissions ?? []);
+
+function may(...required: string[]): boolean {
+    return required.some((permission) =>
+        permissions.value.includes(permission),
+    );
+}
 
 const mainNavItems = computed((): NavItem[] => {
     const slug = organizationSlug.value;
@@ -64,7 +76,7 @@ const mainNavItems = computed((): NavItem[] => {
         ];
     }
 
-    return [
+    const items: NavItem[] = [
         {
             title: 'Dashboard',
             href: orgDashboard.url(slug),
@@ -93,6 +105,24 @@ const mainNavItems = computed((): NavItem[] => {
             icon: Tags,
         },
     ];
+
+    if (may('crm.quote.approve')) {
+        items.push({
+            title: 'Approvals',
+            href: orgApprovalQueueIndex.url(slug),
+            icon: Stamp,
+        });
+    }
+
+    if (may('crm.quote.tax_calculate', 'crm.quote.tax_override')) {
+        items.push({
+            title: 'Tax settings',
+            href: orgTaxSettingsEdit.url(slug),
+            icon: Percent,
+        });
+    }
+
+    return items;
 });
 
 const footerNavItems: NavItem[] = [];

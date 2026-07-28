@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Deal;
 use App\Models\Quote;
 use App\Models\QuoteRevision;
+use App\Support\Quotes\Approval\InvalidQuoteApprovalException;
 use App\Support\Quotes\ImmutableQuoteRevisionException;
 use App\Support\Quotes\InvalidQuoteDraftException;
+use App\Support\Quotes\Tax\InvalidQuoteTaxCalculationException;
 use App\Support\Quotes\Totals\InvalidQuoteTotalsException;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Validation\ValidationException;
@@ -68,6 +70,11 @@ trait HandlesQuoteDrafts
      * Translate domain refusals into HTTP: invalid payloads become validation errors,
      * frozen revisions become 409. StaleQuoteStateException is already a 409 HttpException.
      *
+     * Unresolvable tax positions and impossible approval steps are refusals about the
+     * payload the caller sent — an unusable rate, a missing reason, a revision that is
+     * not awaiting a decision — so they surface as validation errors alongside the
+     * draft ones rather than as conflicts.
+     *
      * @template TReturn
      *
      * @param  callable(): TReturn  $mutation
@@ -77,7 +84,13 @@ trait HandlesQuoteDrafts
     {
         try {
             return $mutation();
-        } catch (InvalidQuoteDraftException|InvalidQuoteTotalsException|InvalidArgumentException $exception) {
+        } catch (
+            InvalidQuoteDraftException
+            |InvalidQuoteTotalsException
+            |InvalidQuoteTaxCalculationException
+            |InvalidQuoteApprovalException
+            |InvalidArgumentException $exception
+        ) {
             throw ValidationException::withMessages(['quote' => $exception->getMessage()]);
         } catch (ImmutableQuoteRevisionException $exception) {
             throw new HttpException(409, $exception->getMessage());

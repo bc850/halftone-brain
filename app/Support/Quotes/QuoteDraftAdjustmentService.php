@@ -25,6 +25,7 @@ final class QuoteDraftAdjustmentService
     public function __construct(
         private QuoteDraftLock $lock,
         private QuoteRevisionTotalsSynchronizer $totals,
+        private QuoteApprovalInvalidationService $invalidation,
         private Auditor $auditor,
     ) {}
 
@@ -296,6 +297,16 @@ final class QuoteDraftAdjustmentService
             );
 
             $outcome = $mutation($lockedQuote, $lockedRevision);
+            $correlationId = (string) Str::uuid();
+
+            // Money moved, so any tax figure and any pending approval stop describing
+            // this revision. The bump below is the single one for this action.
+            $this->invalidation->invalidateForFinancialMutation(
+                $lockedQuote,
+                $lockedRevision,
+                $actor,
+                $correlationId,
+            );
 
             $this->totals->sync($lockedRevision, $actor);
             $this->lock->bumpRevisionLock($lockedRevision);
@@ -309,7 +320,7 @@ final class QuoteDraftAdjustmentService
                 actor: $actor,
                 before: $outcome['before'] ?? null,
                 after: $outcome['after'] ?? null,
-                correlationId: (string) Str::uuid(),
+                correlationId: $correlationId,
             );
 
             return $outcome['result'];

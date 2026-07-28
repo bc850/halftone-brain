@@ -3,16 +3,21 @@
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
+use App\Http\Controllers\OrganizationCompanyTaxCertificateController;
 use App\Http\Controllers\OrganizationProductController;
 use App\Http\Controllers\OrganizationProductSourceController;
+use App\Http\Controllers\OrganizationTaxSettingsController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QuoteApprovalController;
+use App\Http\Controllers\QuoteApprovalQueueController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\QuotePartySnapshotController;
 use App\Http\Controllers\QuoteRepriceController;
 use App\Http\Controllers\QuoteRevisionAdjustmentController;
 use App\Http\Controllers\QuoteRevisionController;
 use App\Http\Controllers\QuoteRevisionLineController;
+use App\Http\Controllers\QuoteTaxController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VendorProductOfferingController;
 use App\Http\Controllers\VisibilityPreferenceController;
@@ -56,6 +61,27 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
         Route::resource('contacts', ContactController::class);
         Route::resource('deals', DealController::class);
         Route::patch('deals/{deal}/stage', [DealController::class, 'updateStage'])->name('deals.stage');
+
+        /*
+         | Exemption certificates belong to this organization's relationship with the
+         | customer, so they hang off the company rather than standing alone.
+         */
+        Route::prefix('companies/{company}/tax-certificates')
+            ->name('companies.tax-certificates.')
+            ->group(function (): void {
+                Route::get('/', [OrganizationCompanyTaxCertificateController::class, 'index'])->name('index');
+                Route::post('/', [OrganizationCompanyTaxCertificateController::class, 'store'])->name('store');
+                Route::patch('{taxCertificate}', [OrganizationCompanyTaxCertificateController::class, 'update'])
+                    ->name('update');
+                Route::post('{taxCertificate}/verify', [OrganizationCompanyTaxCertificateController::class, 'verify'])
+                    ->name('verify');
+                Route::post('{taxCertificate}/reject', [OrganizationCompanyTaxCertificateController::class, 'reject'])
+                    ->name('reject');
+                Route::post('{taxCertificate}/revoke', [OrganizationCompanyTaxCertificateController::class, 'revoke'])
+                    ->name('revoke');
+                Route::post('{taxCertificate}/mark-expired', [OrganizationCompanyTaxCertificateController::class, 'markExpired'])
+                    ->name('mark-expired');
+            });
 
         /*
          | Quotes are tenant-only: there is no legacy `/quotes` surface to fall back to.
@@ -103,6 +129,44 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
                     ->name('adjustments.update');
                 Route::delete('adjustments/{adjustment}', [QuoteRevisionAdjustmentController::class, 'destroy'])
                     ->name('adjustments.destroy');
+
+                Route::post('tax/calculate', [QuoteTaxController::class, 'calculate'])->name('tax.calculate');
+                Route::post('tax/override', [QuoteTaxController::class, 'override'])->name('tax.override');
+                Route::get('tax/history', [QuoteTaxController::class, 'history'])->name('tax.history');
+
+                Route::post('approvals/evaluate', [QuoteApprovalController::class, 'evaluate'])
+                    ->name('approvals.evaluate');
+                Route::post('approvals/submit', [QuoteApprovalController::class, 'submit'])
+                    ->name('approvals.submit');
+                Route::post('approvals/withdraw', [QuoteApprovalController::class, 'withdraw'])
+                    ->name('approvals.withdraw');
+                Route::post('approvals/return-to-draft', [QuoteApprovalController::class, 'returnToDraft'])
+                    ->name('approvals.return-to-draft');
+            });
+
+        /*
+         | The approver's queue is organization-wide rather than nested under a quote:
+         | it exists to find the quotes waiting on a decision.
+         */
+        Route::get('quote-approvals', [QuoteApprovalQueueController::class, 'index'])
+            ->name('quote-approvals.index');
+        Route::post('quote-approvals/{approvalRequest}/approve', [QuoteApprovalQueueController::class, 'approve'])
+            ->name('quote-approvals.approve');
+        Route::post('quote-approvals/{approvalRequest}/reject', [QuoteApprovalQueueController::class, 'reject'])
+            ->name('quote-approvals.reject');
+
+        Route::prefix('tax-settings')
+            ->name('tax-settings.')
+            ->group(function (): void {
+                Route::get('/', [OrganizationTaxSettingsController::class, 'edit'])->name('edit');
+                Route::put('profile', [OrganizationTaxSettingsController::class, 'updateProfile'])->name('profile');
+                Route::post('rates', [OrganizationTaxSettingsController::class, 'storeRate'])->name('rates.store');
+                Route::patch('rates/{taxRate}', [OrganizationTaxSettingsController::class, 'updateRate'])
+                    ->name('rates.update');
+                Route::post('rates/{taxRate}/deactivate', [OrganizationTaxSettingsController::class, 'deactivateRate'])
+                    ->name('rates.deactivate');
+                Route::post('rates/{taxRate}/supersede', [OrganizationTaxSettingsController::class, 'supersedeRate'])
+                    ->name('rates.supersede');
             });
 
         Route::resource('vendors', VendorController::class);

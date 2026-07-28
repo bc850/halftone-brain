@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
+import QuoteApprovalPanel from '@/components/quotes/QuoteApprovalPanel.vue';
 import QuoteTaxNotice from '@/components/quotes/QuoteTaxNotice.vue';
+import QuoteTaxPanel from '@/components/quotes/QuoteTaxPanel.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganizationSlug } from '@/composables/useTenantAction';
@@ -9,13 +11,20 @@ import { dashboard } from '@/routes';
 import { index as legacyDealIndex } from '@/routes/deals';
 import { show as showQuote } from '@/routes/org/quotes';
 import revisions from '@/routes/org/quotes/revisions';
-import type { QuoteDetail, QuoteRevisionDetail } from '@/types';
+import type {
+    QuoteApprovalPanel as ApprovalPanelData,
+    QuoteDetail,
+    QuoteRevisionDetail,
+    QuoteTaxPanel as TaxPanelData,
+} from '@/types';
 
 const props = defineProps<{
     quote: QuoteDetail;
     revision: QuoteRevisionDetail;
     canViewCost: boolean;
     canUpdate: boolean;
+    tax: TaxPanelData;
+    approval: ApprovalPanelData;
 }>();
 
 const slug = useOrganizationSlug();
@@ -208,6 +217,33 @@ defineOptions({
                 <span>Pre-tax total</span>
                 <span>${{ props.revision.pretax_total }}</span>
             </div>
+            <template v-if="props.revision.grand_total">
+                <div class="flex justify-between gap-4">
+                    <span class="text-muted-foreground">Tax</span>
+                    <span>${{ props.revision.tax }}</span>
+                </div>
+                <div
+                    class="flex justify-between gap-4 border-t pt-2 font-medium"
+                >
+                    <span>Grand total</span>
+                    <span>${{ props.revision.grand_total }}</span>
+                </div>
+            </template>
         </section>
+
+        <QuoteTaxPanel
+            :tax="props.tax"
+            :quote-id="props.quote.id"
+            :revision-id="props.revision.id"
+            :lock-version="props.revision.lock_version"
+        />
+
+        <QuoteApprovalPanel
+            :approval="props.approval"
+            :quote-id="props.quote.id"
+            :revision-id="props.revision.id"
+            :lock-version="props.revision.lock_version"
+            :quote-lock-version="props.quote.lock_version"
+        />
     </div>
 </template>

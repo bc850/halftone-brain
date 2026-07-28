@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\Deal;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
+use App\Models\OrganizationCompanyTaxCertificate;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantRoute;
@@ -127,6 +128,13 @@ class CompanyController extends Controller
                     ->values(),
             ],
             'canCreateDeal' => $request->user()->can('create', Deal::class),
+            // Certificates live on the organization's relationship with this customer,
+            // so the link only exists inside a tenant context.
+            'taxCertificatesUrl' => TenantContext::has()
+                ? TenantRoute::to('companies.tax-certificates.index', $company)
+                : null,
+            'canViewTaxCertificates' => $request->user()
+                ->can('viewAny', OrganizationCompanyTaxCertificate::class),
         ]);
     }
 

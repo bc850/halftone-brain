@@ -131,6 +131,18 @@ final class QuoteApprovalEvaluator
     }
 
     /**
+     * Every reason this engine can produce, in presentation order, with its
+     * explanation. Callers offering a reason filter should read it from here so the
+     * choices can never drift from the triggers that actually fire.
+     *
+     * @return array<string, string>
+     */
+    public static function reasonCatalog(): array
+    {
+        return self::EXPLANATIONS;
+    }
+
+    /**
      * @param  list<string>  $reasons
      * @return array<string, string>
      */

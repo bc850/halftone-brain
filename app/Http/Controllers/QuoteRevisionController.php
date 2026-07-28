@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\QuoteRevisionStatus;
 use App\Enums\UnitOfMeasure;
+use App\Http\Controllers\Concerns\BuildsQuoteTaxAndApprovalPanels;
 use App\Http\Controllers\Concerns\HandlesQuoteDrafts;
 use App\Http\Controllers\Concerns\RequiresTenantContext;
 use App\Http\Requests\CloneQuoteRevisionRequest;
@@ -26,6 +27,7 @@ use Inertia\Response;
 
 class QuoteRevisionController extends Controller
 {
+    use BuildsQuoteTaxAndApprovalPanels;
     use HandlesQuoteDrafts;
     use RequiresTenantContext;
 
@@ -57,6 +59,9 @@ class QuoteRevisionController extends Controller
             ),
             'canViewCost' => $canViewCost,
             'canUpdate' => $user->can('update', $quote),
+            'tax' => $this->taxPanel($quote, $quoteRevision, $user),
+            'approval' => $this->approvalPanel($quote, $quoteRevision, $user),
+            'quoteUrl' => TenantRoute::to('quotes.show', $quote),
         ]);
     }
 
@@ -99,6 +104,8 @@ class QuoteRevisionController extends Controller
             'canViewCost' => $canViewCost,
             'canOverridePrice' => $this->mayOverridePrice(),
             'canApproveBelowMinimum' => $this->mayApproveBelowMinimum(),
+            'tax' => $this->taxPanel($quote, $quoteRevision, $user),
+            'approval' => $this->approvalPanel($quote, $quoteRevision, $user),
             'partyEditUrl' => TenantRoute::to('quotes.revisions.party.edit', [
                 'quote' => $quote,
                 'quoteRevision' => $quoteRevision,

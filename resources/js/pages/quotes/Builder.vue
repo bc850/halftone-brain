@@ -2,7 +2,9 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import Heading from '@/components/Heading.vue';
+import QuoteApprovalPanel from '@/components/quotes/QuoteApprovalPanel.vue';
 import QuoteTaxNotice from '@/components/quotes/QuoteTaxNotice.vue';
+import QuoteTaxPanel from '@/components/quotes/QuoteTaxPanel.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,9 +16,11 @@ import revisions from '@/routes/org/quotes/revisions';
 import type {
     CatalogOption,
     QuoteAdjustment,
+    QuoteApprovalPanel as ApprovalPanelData,
     QuoteDetail,
     QuoteLine,
     QuoteRevisionDetail,
+    QuoteTaxPanel as TaxPanelData,
 } from '@/types';
 
 const props = defineProps<{
@@ -28,6 +32,8 @@ const props = defineProps<{
     canViewCost: boolean;
     canOverridePrice: boolean;
     canApproveBelowMinimum: boolean;
+    tax: TaxPanelData;
+    approval: ApprovalPanelData;
     partyEditUrl: string;
     quoteUrl: string;
 }>();
@@ -327,21 +333,6 @@ defineOptions({
         </div>
 
         <QuoteTaxNotice :message="revisionDetail.tax_message" />
-
-        <div
-            v-if="revisionDetail.approval_required"
-            class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-950 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"
-        >
-            <p class="font-medium">Approval required</p>
-            <ul class="list-inside list-disc">
-                <li
-                    v-for="reason in revisionDetail.approval_reasons"
-                    :key="reason"
-                >
-                    {{ reason }}
-                </li>
-            </ul>
-        </div>
 
         <!-- 1. Customer -->
         <section class="space-y-3 rounded-xl border p-4 text-sm">
@@ -945,12 +936,42 @@ defineOptions({
                     <span>Pre-tax total</span>
                     <span>${{ revisionDetail.pretax_total }}</span>
                 </div>
-                <p class="text-xs text-muted-foreground">
+                <div
+                    v-if="revisionDetail.grand_total"
+                    class="flex justify-between gap-4"
+                >
+                    <span class="text-muted-foreground">Tax</span>
+                    <span>${{ revisionDetail.tax }}</span>
+                </div>
+                <div
+                    v-if="revisionDetail.grand_total"
+                    class="flex justify-between gap-4 border-t pt-2 font-medium"
+                >
+                    <span>Grand total</span>
+                    <span>${{ revisionDetail.grand_total }}</span>
+                </div>
+                <p v-else class="text-xs text-muted-foreground">
                     Taxable base so far: ${{
                         revisionDetail.provisional_taxable_amount
                     }}
                 </p>
             </section>
         </div>
+
+        <!-- 7. Tax and approval -->
+        <QuoteTaxPanel
+            :tax="props.tax"
+            :quote-id="props.quote.id"
+            :revision-id="props.revision.id"
+            :lock-version="props.revision.lock_version"
+        />
+
+        <QuoteApprovalPanel
+            :approval="props.approval"
+            :quote-id="props.quote.id"
+            :revision-id="props.revision.id"
+            :lock-version="props.revision.lock_version"
+            :quote-lock-version="props.quote.lock_version"
+        />
     </div>
 </template>

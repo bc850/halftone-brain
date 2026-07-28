@@ -107,6 +107,35 @@ final class Money
     }
 
     /**
+     * Convert a percentage string (e.g. "8" or "8.5") to parts per million, so 8% is 80,000 ppm.
+     */
+    public static function percentToRatePartsPerMillion(string $percent): int
+    {
+        self::assertDecimalString($percent);
+
+        $scaled = bcmul($percent, (string) intdiv(self::RATE_PARTS_PER_MILLION, 100), 8);
+
+        return self::intFromNumericString(
+            self::roundScaled($scaled, 0),
+            'Parts-per-million rate overflows integer range.',
+        );
+    }
+
+    /**
+     * Convert a parts-per-million rate back to a percentage string with four fractional digits.
+     *
+     * @return numeric-string
+     */
+    public static function ratePartsPerMillionToPercent(int $ratePpm): string
+    {
+        if ($ratePpm < 0) {
+            throw new InvalidArgumentException('Parts-per-million rate cannot be negative.');
+        }
+
+        return bcdiv((string) $ratePpm, (string) intdiv(self::RATE_PARTS_PER_MILLION, 100), 4);
+    }
+
+    /**
      * Calculate suggested list price in cents from cost micro-units and markup basis points.
      */
     public static function suggestedListPriceCents(int $costMicroUnits, int $markupBasisPoints): int

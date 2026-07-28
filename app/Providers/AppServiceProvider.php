@@ -7,12 +7,15 @@ use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
+use App\Models\OrganizationCompanyTaxCertificate;
 use App\Models\OrganizationProduct;
 use App\Models\OrganizationProductSource;
 use App\Models\OrganizationProductUnitConversion;
+use App\Models\OrganizationTaxRate;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quote;
+use App\Models\QuoteApprovalRequest;
 use App\Models\QuoteRevision;
 use App\Models\QuoteRevisionAdjustment;
 use App\Models\QuoteRevisionLineItem;
@@ -180,6 +183,43 @@ class AppServiceProvider extends ServiceProvider
             return QuoteRevisionAdjustment::query()
                 ->whereKey($value)
                 ->where('quote_revision_id', $quoteRevision->id)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        /*
+         | Tax and approval records are organization property with no legacy surface,
+         | so a missing tenant context is a 404 rather than a global lookup.
+         */
+        Route::bind('taxRate', function (string $value): OrganizationTaxRate {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            return OrganizationTaxRate::query()
+                ->whereKey($value)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('taxCertificate', function (string $value): OrganizationCompanyTaxCertificate {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            return OrganizationCompanyTaxCertificate::query()
+                ->whereKey($value)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('approvalRequest', function (string $value): QuoteApprovalRequest {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            return QuoteApprovalRequest::query()
+                ->whereKey($value)
                 ->where('organization_id', TenantContext::get()->organizationId)
                 ->firstOrFail();
         });

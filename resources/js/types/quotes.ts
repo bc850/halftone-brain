@@ -105,6 +105,11 @@ export type QuoteRevisionSummary = {
     tax_unresolved: boolean;
     tax_pending: boolean;
     totals_are_pretax: boolean;
+    tax: string;
+    tax_cents: number;
+    /** Null until the tax engine resolves a position; a total with unknown tax is not a total. */
+    grand_total: string | null;
+    grand_total_cents: number | null;
     tax_message: string | null;
     created_at: string | null;
 };
@@ -149,6 +154,142 @@ export type QuoteSummary = {
 export type QuoteDetail = QuoteSummary & {
     deal: { id: number; name: string } | null;
     revisions: QuoteRevisionSummary[];
+};
+
+export type TaxRate = {
+    id: number;
+    jurisdiction_code: string;
+    display_name: string;
+    country: string;
+    state: string | null;
+    county: string | null;
+    city: string | null;
+    postal_code: string | null;
+    rate_ppm: number;
+    rate_percent: string;
+    effective_from: string;
+    effective_through: string | null;
+    is_active: boolean;
+    source_note: string | null;
+    created_at: string | null;
+};
+
+export type TaxProfile = {
+    id: number;
+    default_country: string;
+    default_state: string | null;
+    sourcing_strategy: string;
+    sourcing_strategy_label: string;
+    registration_reference: string | null;
+    tax_calculation_enabled: boolean;
+    is_active: boolean;
+    configuration_version: number;
+    updated_at: string | null;
+};
+
+/**
+ * Certificate number, evidence reference, internal notes, and rejection reason are
+ * absent entirely — not null — without certificate view authority.
+ */
+export type TaxCertificate = {
+    id: number;
+    organization_company_id: number;
+    exemption_category: string;
+    exemption_category_label: string;
+    jurisdiction_state: string;
+    certificate_form_type: string;
+    verification_status: string;
+    verification_status_label: string;
+    effective_date: string;
+    expiration_date: string | null;
+    verified_at: string | null;
+    certificate_reference: string;
+    has_evidence: boolean;
+    has_rejection_reason: boolean;
+    is_editable: boolean;
+    can_support_exemption: boolean;
+    certificate_number?: string | null;
+    evidence_reference?: string | null;
+    internal_notes?: string | null;
+    rejection_reason?: string | null;
+};
+
+export type TaxCalculation = {
+    id: number;
+    calculation_version: number;
+    outcome: string;
+    is_resolved: boolean;
+    taxable_basis: string;
+    taxable_basis_cents: number;
+    rate_ppm: number | null;
+    rate_percent: string | null;
+    tax: string;
+    tax_cents: number;
+    jurisdiction: Record<string, string | null> | null;
+    source: string;
+    is_override: boolean;
+    override_reason: string | null;
+    certificate_reference: string | null;
+    calculator_version: string;
+    calculated_at: string;
+};
+
+export type QuoteTaxPanel = {
+    status: string;
+    is_resolved: boolean;
+    /** Why the engine could not resolve a position, when it could not. */
+    review_reasons: string[];
+    current: TaxCalculation | null;
+    history: TaxCalculation[];
+    profile: TaxProfile | null;
+    rates: TaxRate[];
+    certificates: TaxCertificate[];
+    service_address: QuoteAddress | null;
+    billing_address: QuoteAddress | null;
+    can_calculate: boolean;
+    can_override: boolean;
+    disclaimer: string;
+};
+
+export type ApprovalRequest = {
+    id: number;
+    quote_id: number;
+    quote_revision_id: number;
+    request_version: number;
+    status: string;
+    is_open: boolean;
+    reasons: string[];
+    explanations: Record<string, string>;
+    threshold_basis: string;
+    threshold_basis_cents: number;
+    requested_by: string | null;
+    requested_by_membership_id: number;
+    requested_at: string;
+    age_days: number;
+    resolved_at: string | null;
+    quote_number: string | null;
+    quote_lock_version: number | null;
+    revision_number: number | null;
+    revision_status: string | null;
+    revision_lock_version: number | null;
+    pretax_total: string;
+    pretax_total_cents: number;
+    tax_calculation_status: string | null;
+};
+
+export type QuoteApprovalPanel = {
+    status: string;
+    approval_required: boolean;
+    reasons: string[];
+    explanations: Record<string, string>;
+    current_request: ApprovalRequest | null;
+    reason_catalog: Record<string, string>;
+    can_evaluate: boolean;
+    can_submit: boolean;
+    can_withdraw: boolean;
+    can_return_to_draft: boolean;
+    can_decide: boolean;
+    blocked_by_tax: boolean;
 };
 
 export type CatalogOption = {
