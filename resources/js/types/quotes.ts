@@ -149,6 +149,9 @@ export type QuoteSummary = {
     created_at: string | null;
     can_update: boolean;
     can_void: boolean;
+    can_generate_document: boolean;
+    can_send: boolean;
+    can_record_customer_response: boolean;
 };
 
 export type QuoteDetail = QuoteSummary & {
@@ -290,6 +293,71 @@ export type QuoteApprovalPanel = {
     can_return_to_draft: boolean;
     can_decide: boolean;
     blocked_by_tax: boolean;
+};
+
+export type QuoteDocument = {
+    id: number;
+    document_type: string;
+    document_version: number;
+    generation_status: string;
+    mime_type: string | null;
+    byte_size: number | null;
+    content_sha256: string | null;
+    generated_at: string | null;
+    failure_code: string | null;
+    failure_message: string | null;
+    has_pdf: boolean;
+    has_html: boolean;
+    created_at: string | null;
+};
+
+export type QuoteDelivery = {
+    id: number;
+    quote_revision_document_id: number;
+    channel: string;
+    status: string;
+    recipient_name_snapshot: string;
+    recipient_email_snapshot: string;
+    external_message_id: string | null;
+    requested_at: string | null;
+    sent_at: string | null;
+    failed_at: string | null;
+    failure_code: string | null;
+    failure_message: string | null;
+    created_at: string | null;
+};
+
+export type QuoteCustomerAccessToken = {
+    id: number;
+    quote_revision_document_id: number;
+    purpose: string;
+    expires_at: string;
+    revoked_at: string | null;
+    revoke_reason: string | null;
+    is_usable: boolean;
+    is_revoked: boolean;
+    is_expired: boolean;
+    view_count: number;
+    last_viewed_at: string | null;
+    terminal_response_at: string | null;
+    created_at: string | null;
+};
+
+export type QuoteDeliveryPanel = {
+    current_document: QuoteDocument | null;
+    documents: QuoteDocument[];
+    deliveries: QuoteDelivery[];
+    tokens: QuoteCustomerAccessToken[];
+    active_token: QuoteCustomerAccessToken | null;
+    pending_delivery: QuoteDelivery | null;
+    recipient_defaults: {
+        name: string | null;
+        email: string | null;
+    };
+    can_generate_document: boolean;
+    can_send: boolean;
+    can_record_customer_response: boolean;
+    can_preview_document: boolean;
 };
 
 export type CatalogOption = {

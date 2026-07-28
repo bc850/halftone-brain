@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
 import QuoteApprovalPanel from '@/components/quotes/QuoteApprovalPanel.vue';
+import QuoteDeliveryPanel from '@/components/quotes/QuoteDeliveryPanel.vue';
 import QuoteTaxNotice from '@/components/quotes/QuoteTaxNotice.vue';
 import QuoteTaxPanel from '@/components/quotes/QuoteTaxPanel.vue';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,7 @@ import { show as showQuote } from '@/routes/org/quotes';
 import revisions from '@/routes/org/quotes/revisions';
 import type {
     QuoteApprovalPanel as ApprovalPanelData,
+    QuoteDeliveryPanel as DeliveryPanelData,
     QuoteDetail,
     QuoteRevisionDetail,
     QuoteTaxPanel as TaxPanelData,
@@ -25,6 +27,7 @@ const props = defineProps<{
     canUpdate: boolean;
     tax: TaxPanelData;
     approval: ApprovalPanelData;
+    delivery: DeliveryPanelData;
 }>();
 
 const slug = useOrganizationSlug();
@@ -57,6 +60,19 @@ defineOptions({
                 <Button variant="outline" as-child>
                     <Link :href="showQuote([slug, props.quote.id])">
                         Quote overview
+                    </Link>
+                </Button>
+                <Button variant="outline" as-child>
+                    <Link
+                        :href="
+                            revisions.delivery([
+                                slug,
+                                props.quote.id,
+                                props.revision.id,
+                            ])
+                        "
+                    >
+                        Delivery
                     </Link>
                 </Button>
                 <Button
@@ -240,6 +256,14 @@ defineOptions({
 
         <QuoteApprovalPanel
             :approval="props.approval"
+            :quote-id="props.quote.id"
+            :revision-id="props.revision.id"
+            :lock-version="props.revision.lock_version"
+            :quote-lock-version="props.quote.lock_version"
+        />
+
+        <QuoteDeliveryPanel
+            :delivery="props.delivery"
             :quote-id="props.quote.id"
             :revision-id="props.revision.id"
             :lock-version="props.revision.lock_version"

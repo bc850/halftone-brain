@@ -44,6 +44,9 @@ final class QuoteResource
             'created_at' => $quote->created_at?->toIso8601String(),
             'can_update' => $user->can('update', $quote),
             'can_void' => $user->can('void', $quote),
+            'can_generate_document' => $user->can('generateDocument', $quote),
+            'can_send' => $user->can('send', $quote),
+            'can_record_customer_response' => $user->can('recordCustomerResponse', $quote),
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\QuoteRevisionStatus;
 use App\Enums\UnitOfMeasure;
+use App\Http\Controllers\Concerns\BuildsQuoteDeliveryPanel;
 use App\Http\Controllers\Concerns\BuildsQuoteTaxAndApprovalPanels;
 use App\Http\Controllers\Concerns\HandlesQuoteDrafts;
 use App\Http\Controllers\Concerns\RequiresTenantContext;
@@ -27,6 +28,7 @@ use Inertia\Response;
 
 class QuoteRevisionController extends Controller
 {
+    use BuildsQuoteDeliveryPanel;
     use BuildsQuoteTaxAndApprovalPanels;
     use HandlesQuoteDrafts;
     use RequiresTenantContext;
@@ -61,6 +63,7 @@ class QuoteRevisionController extends Controller
             'canUpdate' => $user->can('update', $quote),
             'tax' => $this->taxPanel($quote, $quoteRevision, $user),
             'approval' => $this->approvalPanel($quote, $quoteRevision, $user),
+            'delivery' => $this->deliveryPanel($quote, $quoteRevision, $user),
             'quoteUrl' => TenantRoute::to('quotes.show', $quote),
         ]);
     }

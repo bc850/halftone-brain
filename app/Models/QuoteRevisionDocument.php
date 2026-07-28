@@ -71,6 +71,32 @@ class QuoteRevisionDocument extends Model
     public const UPDATED_AT = null;
 
     /**
+     * Escape hatch for Pending → Generated/Failed finalization only.
+     * Generated documents remain immutable forever.
+     */
+    public static bool $allowGenerationFinalization = false;
+
+    /**
+     * Fields a generation service may write while finalizing a pending row.
+     *
+     * @var list<string>
+     */
+    public const GENERATION_FINALIZATION_FIELDS = [
+        'generation_status',
+        'customer_payload_snapshot_json',
+        'private_html_path',
+        'private_pdf_path',
+        'mime_type',
+        'byte_size',
+        'content_sha256',
+        'generated_by_membership_id',
+        'generated_by_user_id',
+        'generated_at',
+        'failure_code',
+        'failure_message',
+    ];
+
+    /**
      * @var array<string, mixed>
      */
     protected $attributes = [
@@ -81,8 +107,35 @@ class QuoteRevisionDocument extends Model
 
     protected static function booted(): void
     {
-        static::updating(function (): void {
-            throw new LogicException('Quote revision documents are immutable and cannot be updated.');
+        static::updating(function (QuoteRevisionDocument $document): void {
+            if (! self::$allowGenerationFinalization) {
+                throw new LogicException('Quote revision documents are immutable and cannot be updated.');
+            }
+
+            $originalStatus = $document->getRawOriginal('generation_status');
+            $from = is_string($originalStatus)
+                ? QuoteDocumentGenerationStatus::from($originalStatus)
+                : $document->generation_status;
+
+            if ($from !== QuoteDocumentGenerationStatus::Pending) {
+                throw new LogicException('Only pending quote revision documents may be finalized.');
+            }
+
+            $to = $document->generation_status;
+            if (! in_array($to, [
+                QuoteDocumentGenerationStatus::Generated,
+                QuoteDocumentGenerationStatus::Failed,
+            ], true)) {
+                throw new LogicException('Pending documents may only finalize to generated or failed.');
+            }
+
+            $dirty = array_keys($document->getDirty());
+            $forbidden = array_values(array_diff($dirty, self::GENERATION_FINALIZATION_FIELDS));
+            if ($forbidden !== []) {
+                throw new LogicException(
+                    'Document finalization cannot change non-finalization fields: '.implode(', ', $forbidden)
+                );
+            }
         });
 
         static::deleting(function (): void {

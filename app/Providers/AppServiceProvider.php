@@ -16,8 +16,11 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quote;
 use App\Models\QuoteApprovalRequest;
+use App\Models\QuoteCustomerAccessToken;
+use App\Models\QuoteDelivery;
 use App\Models\QuoteRevision;
 use App\Models\QuoteRevisionAdjustment;
+use App\Models\QuoteRevisionDocument;
 use App\Models\QuoteRevisionLineItem;
 use App\Models\Team;
 use App\Models\Vendor;
@@ -181,6 +184,55 @@ class AppServiceProvider extends ServiceProvider
             $quoteRevision = $route->parameter('quoteRevision');
 
             return QuoteRevisionAdjustment::query()
+                ->whereKey($value)
+                ->where('quote_revision_id', $quoteRevision->id)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('document', function (string $value, \Illuminate\Routing\Route $route): QuoteRevisionDocument {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            /** @var QuoteRevision $quoteRevision */
+            $quoteRevision = $route->parameter('quoteRevision');
+
+            return QuoteRevisionDocument::query()
+                ->whereKey($value)
+                ->where('quote_revision_id', $quoteRevision->id)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('delivery', function (string $value, \Illuminate\Routing\Route $route): QuoteDelivery {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            /** @var QuoteRevision $quoteRevision */
+            $quoteRevision = $route->parameter('quoteRevision');
+
+            return QuoteDelivery::query()
+                ->whereKey($value)
+                ->where('quote_revision_id', $quoteRevision->id)
+                ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        /*
+         | Internal customer-access-token binding uses {customerAccessToken} so the
+         | public /customer/quotes/{token} raw-string parameter is never model-bound.
+         */
+        Route::bind('customerAccessToken', function (string $value, \Illuminate\Routing\Route $route): QuoteCustomerAccessToken {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            /** @var QuoteRevision $quoteRevision */
+            $quoteRevision = $route->parameter('quoteRevision');
+
+            return QuoteCustomerAccessToken::query()
                 ->whereKey($value)
                 ->where('quote_revision_id', $quoteRevision->id)
                 ->where('organization_id', TenantContext::get()->organizationId)

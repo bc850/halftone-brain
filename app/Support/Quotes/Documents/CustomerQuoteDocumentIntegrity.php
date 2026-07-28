@@ -36,6 +36,66 @@ final class CustomerQuoteDocumentIntegrity
     }
 
     /**
+     * Customer document payload used for generation when tax is calculated or exempt.
+     *
+     * Extends the safe projection with tax_cents / grand total while still omitting
+     * all cost, margin, approval, and certificate fields.
+     *
+     * @param  list<QuoteLineCalculationInput>  $lineInputs
+     * @param  list<array{key: string, description: string, adjustment_type: string, amount_cents: int}>  $adjustments
+     * @param  array<string, mixed>  $party
+     * @param  array{
+     *     quote_number: string,
+     *     revision_number: int,
+     *     issue_date: string|null,
+     *     expiration_date: string|null,
+     *     introduction: string|null,
+     *     customer_notes: string|null,
+     *     terms_text: string,
+     *     requested_deposit_cents: int|null
+     * }  $header
+     * @return array<string, mixed>
+     */
+    public function buildTaxResolvedCustomerDocumentPayload(
+        QuoteTotalsResult $totals,
+        array $lineInputs,
+        array $adjustments,
+        array $party,
+        array $header,
+        int $taxCents,
+        string $taxStatus,
+    ): array {
+        $projection = (new CustomerSafeQuoteProjection)->fromTotals($totals, $lineInputs);
+        $grandTotal = $totals->finalPretaxAmountCents + $taxCents;
+
+        $projection['tax_status'] = $taxStatus;
+        $projection['tax_unresolved'] = false;
+        $projection['tax_cents'] = $taxCents;
+        $projection['customer_grand_total_cents'] = $grandTotal;
+        $projection['customer_grand_total_final'] = true;
+        $projection['adjustments'] = $adjustments;
+
+        $payload = [
+            'document_type' => 'customer_quote',
+            'quote_number' => $header['quote_number'],
+            'revision_number' => $header['revision_number'],
+            'issue_date' => $header['issue_date'],
+            'expiration_date' => $header['expiration_date'],
+            'introduction' => $header['introduction'],
+            'customer_notes' => $header['customer_notes'],
+            'terms_text' => $header['terms_text'],
+            'requested_deposit_cents' => $header['requested_deposit_cents'],
+            'party' => $party,
+            'totals' => $projection,
+            'terms_checksum' => $this->termsChecksum($header['terms_text']),
+        ];
+
+        $this->assertNoForbiddenKeys($payload);
+
+        return $payload;
+    }
+
+    /**
      * @param  array<string, mixed>|list<mixed>  $value
      * @return array<string, mixed>|list<mixed>
      */

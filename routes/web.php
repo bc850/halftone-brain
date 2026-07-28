@@ -9,9 +9,15 @@ use App\Http\Controllers\OrganizationProductSourceController;
 use App\Http\Controllers\OrganizationTaxSettingsController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicQuoteController;
 use App\Http\Controllers\QuoteApprovalController;
 use App\Http\Controllers\QuoteApprovalQueueController;
 use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\QuoteCustomerLinkController;
+use App\Http\Controllers\QuoteCustomerTokenController;
+use App\Http\Controllers\QuoteDeliveryController;
+use App\Http\Controllers\QuoteDocumentController;
+use App\Http\Controllers\QuoteEmployeeResponseController;
 use App\Http\Controllers\QuotePartySnapshotController;
 use App\Http\Controllers\QuoteRepriceController;
 use App\Http\Controllers\QuoteRevisionAdjustmentController;
@@ -26,6 +32,20 @@ use App\Http\Middleware\ResolveTenantContextFromRoute;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+/*
+ | Public customer quote links. No auth, no TenantContext. Rate-limited; CSRF
+ | still applies to POST via the web middleware stack.
+ */
+Route::middleware('throttle:30,1')
+    ->prefix('customer/quotes')
+    ->name('public.quotes.')
+    ->group(function (): void {
+        Route::get('{token}', [PublicQuoteController::class, 'show'])->name('show');
+        Route::get('{token}/pdf', [PublicQuoteController::class, 'pdf'])->name('pdf');
+        Route::post('{token}/accept', [PublicQuoteController::class, 'accept'])->name('accept');
+        Route::post('{token}/reject', [PublicQuoteController::class, 'reject'])->name('reject');
+    });
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('preferences/visibility', [VisibilityPreferenceController::class, 'update'])
@@ -142,6 +162,28 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
                     ->name('approvals.withdraw');
                 Route::post('approvals/return-to-draft', [QuoteApprovalController::class, 'returnToDraft'])
                     ->name('approvals.return-to-draft');
+
+                Route::post('documents/generate', [QuoteDocumentController::class, 'generate'])
+                    ->name('documents.generate');
+                Route::get('documents/{document}/preview', [QuoteDocumentController::class, 'preview'])
+                    ->name('documents.preview');
+                Route::get('documents/{document}/download', [QuoteDocumentController::class, 'download'])
+                    ->name('documents.download');
+
+                Route::get('delivery', [QuoteDeliveryController::class, 'show'])->name('delivery');
+                Route::post('customer-link/prepare', [QuoteCustomerLinkController::class, 'prepare'])
+                    ->name('customer-link.prepare');
+                Route::post('deliveries/{delivery}/record-manual', [QuoteDeliveryController::class, 'recordManual'])
+                    ->name('deliveries.record-manual');
+                Route::post('tokens/{customerAccessToken}/revoke', [QuoteCustomerTokenController::class, 'revoke'])
+                    ->name('tokens.revoke');
+                Route::post('tokens/regenerate', [QuoteCustomerTokenController::class, 'regenerate'])
+                    ->name('tokens.regenerate');
+
+                Route::post('employee-responses/accept', [QuoteEmployeeResponseController::class, 'accept'])
+                    ->name('employee-responses.accept');
+                Route::post('employee-responses/reject', [QuoteEmployeeResponseController::class, 'reject'])
+                    ->name('employee-responses.reject');
             });
 
         /*

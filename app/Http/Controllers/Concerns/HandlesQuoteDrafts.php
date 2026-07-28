@@ -6,6 +6,8 @@ use App\Models\Deal;
 use App\Models\Quote;
 use App\Models\QuoteRevision;
 use App\Support\Quotes\Approval\InvalidQuoteApprovalException;
+use App\Support\Quotes\Delivery\InvalidQuoteDeliveryException;
+use App\Support\Quotes\Documents\InvalidQuoteDocumentException;
 use App\Support\Quotes\ImmutableQuoteRevisionException;
 use App\Support\Quotes\InvalidQuoteDraftException;
 use App\Support\Quotes\Tax\InvalidQuoteTaxCalculationException;
@@ -89,6 +91,8 @@ trait HandlesQuoteDrafts
             |InvalidQuoteTotalsException
             |InvalidQuoteTaxCalculationException
             |InvalidQuoteApprovalException
+            |InvalidQuoteDocumentException
+            |InvalidQuoteDeliveryException
             |InvalidArgumentException $exception
         ) {
             throw ValidationException::withMessages(['quote' => $exception->getMessage()]);

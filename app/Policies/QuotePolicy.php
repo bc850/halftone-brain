@@ -101,6 +101,30 @@ class QuotePolicy
     }
 
     /**
+     * Reaching an approved revision's customer document generation.
+     */
+    public function generateDocument(User $user, Quote $quote): bool
+    {
+        return $this->update($user, $quote);
+    }
+
+    /**
+     * Preparing customer links and recording manual delivery / send.
+     */
+    public function send(User $user, Quote $quote): bool
+    {
+        return $this->permits($user, $quote, 'crm.quote.send');
+    }
+
+    /**
+     * Recording an employee-entered customer acceptance or rejection.
+     */
+    public function recordCustomerResponse(User $user, Quote $quote): bool
+    {
+        return $this->permits($user, $quote, 'crm.quote.record_customer_response');
+    }
+
+    /**
      * Organization-scoped permission plus the reach to see this particular quote.
      */
     protected function permits(User $user, Quote $quote, string $permission): bool
