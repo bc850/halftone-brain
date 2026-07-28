@@ -42,6 +42,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $tax_calculated_at
  * @property int|null $current_tax_calculation_id
  * @property int|null $current_approval_request_id
+ * @property int|null $current_document_id
  * @property int|null $requested_deposit_cents
  * @property bool $approval_required
  * @property array<string, mixed>|null $approval_reason_snapshot
@@ -81,6 +82,7 @@ use Illuminate\Support\Carbon;
     'tax_calculated_at',
     'current_tax_calculation_id',
     'current_approval_request_id',
+    'current_document_id',
     'requested_deposit_cents',
     'approval_required',
     'approval_reason_snapshot',
@@ -127,6 +129,7 @@ class QuoteRevision extends Model
         'tax_calculated_at',
         'current_tax_calculation_id',
         'current_approval_request_id',
+        'current_document_id',
         'requested_deposit_cents',
         'approval_required',
         'approval_reason_snapshot',
@@ -146,6 +149,7 @@ class QuoteRevision extends Model
         'lock_version',
         'current_tax_calculation_id',
         'current_approval_request_id',
+        'current_document_id',
         'sent_at',
         'viewed_at',
         'accepted_at',
@@ -232,6 +236,7 @@ class QuoteRevision extends Model
             'tax_calculated_at' => 'datetime',
             'current_tax_calculation_id' => 'integer',
             'current_approval_request_id' => 'integer',
+            'current_document_id' => 'integer',
             'requested_deposit_cents' => 'integer',
             'approval_required' => 'boolean',
             'approval_reason_snapshot' => 'array',
@@ -324,6 +329,46 @@ class QuoteRevision extends Model
     public function currentApprovalRequest(): BelongsTo
     {
         return $this->belongsTo(QuoteApprovalRequest::class, 'current_approval_request_id');
+    }
+
+    /**
+     * @return HasMany<QuoteRevisionDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(QuoteRevisionDocument::class)->orderBy('document_version');
+    }
+
+    /**
+     * @return BelongsTo<QuoteRevisionDocument, $this>
+     */
+    public function currentDocument(): BelongsTo
+    {
+        return $this->belongsTo(QuoteRevisionDocument::class, 'current_document_id');
+    }
+
+    /**
+     * @return HasMany<QuoteDelivery, $this>
+     */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(QuoteDelivery::class);
+    }
+
+    /**
+     * @return HasMany<QuoteCustomerAccessToken, $this>
+     */
+    public function customerAccessTokens(): HasMany
+    {
+        return $this->hasMany(QuoteCustomerAccessToken::class);
+    }
+
+    /**
+     * @return HasMany<QuoteCustomerResponseEvent, $this>
+     */
+    public function customerResponseEvents(): HasMany
+    {
+        return $this->hasMany(QuoteCustomerResponseEvent::class);
     }
 
     /**

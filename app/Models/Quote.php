@@ -169,4 +169,36 @@ class Quote extends Model
     {
         return $this->hasMany(QuoteStatusEvent::class);
     }
+
+    /**
+     * @return HasMany<QuoteRevisionDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(QuoteRevisionDocument::class);
+    }
+
+    /**
+     * @return HasMany<QuoteDelivery, $this>
+     */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(QuoteDelivery::class);
+    }
+
+    /**
+     * @return HasMany<QuoteCustomerAccessToken, $this>
+     */
+    public function customerAccessTokens(): HasMany
+    {
+        return $this->hasMany(QuoteCustomerAccessToken::class);
+    }
+
+    /**
+     * @return HasMany<QuoteCustomerResponseEvent, $this>
+     */
+    public function customerResponseEvents(): HasMany
+    {
+        return $this->hasMany(QuoteCustomerResponseEvent::class);
+    }
 }

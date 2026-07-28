@@ -47,6 +47,10 @@ final class RbacDefinitions
             ['key' => 'crm.tax_certificate.view', 'module' => 'crm', 'description' => 'View customer exemption certificates'],
             ['key' => 'crm.tax_certificate.manage', 'module' => 'crm', 'description' => 'Create, update, and verify customer exemption certificates'],
 
+            // Organization CRM — quote delivery and customer response (Phase 2D.1)
+            ['key' => 'crm.quote.send', 'module' => 'crm', 'description' => 'Send customer quote documents and record manual delivery'],
+            ['key' => 'crm.quote.record_customer_response', 'module' => 'crm', 'description' => 'Record an employee-entered customer quote acceptance or rejection'],
+
             // OrganizationCompany
             ['key' => 'crm.org_company.view', 'module' => 'crm', 'description' => 'View organization-company relationships'],
             ['key' => 'crm.org_company.create', 'module' => 'crm', 'description' => 'Associate companies with the organization'],
@@ -115,6 +119,7 @@ final class RbacDefinitions
             'crm.quote.view', 'crm.quote.view_all', 'crm.quote.create', 'crm.quote.update', 'crm.quote.void',
             'crm.quote.approve', 'crm.quote.tax_calculate', 'crm.quote.tax_override',
             'crm.tax_certificate.view', 'crm.tax_certificate.manage',
+            'crm.quote.send', 'crm.quote.record_customer_response',
             'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update', 'crm.org_company.delete',
             'catalog.product.view', 'catalog.product.create', 'catalog.product.update', 'catalog.product.delete', 'catalog.product.view_cost',
             'catalog.org_product.manage', 'catalog.org_product.manage_pricing', 'catalog.org_product.override_price',
@@ -182,6 +187,7 @@ final class RbacDefinitions
                     'crm.quote.view', 'crm.quote.view_all', 'crm.quote.create', 'crm.quote.update', 'crm.quote.void',
                     'crm.quote.approve', 'crm.quote.tax_calculate',
                     'crm.tax_certificate.view',
+                    'crm.quote.send', 'crm.quote.record_customer_response',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                     'catalog.org_product.override_price', 'catalog.org_product.override_margin',
@@ -199,6 +205,7 @@ final class RbacDefinitions
                     'crm.quote.view', 'crm.quote.create', 'crm.quote.update',
                     'crm.quote.tax_calculate',
                     'crm.tax_certificate.view',
+                    'crm.quote.send',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                 ],

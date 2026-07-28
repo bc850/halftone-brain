@@ -99,6 +99,12 @@ function phase2c1Rollback(): void
         // SQLite cannot drop a column that a named foreign key references, so the
         // pointer columns are removed by rebuilding rather than through down().
         Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('integration_outbox');
+        Schema::dropIfExists('quote_customer_response_events');
+        Schema::dropIfExists('quote_customer_access_tokens');
+        Schema::dropIfExists('quote_delivery_events');
+        Schema::dropIfExists('quote_deliveries');
+        Schema::dropIfExists('quote_revision_documents');
         Schema::dropIfExists('quote_approval_decisions');
         Schema::dropIfExists('quote_approval_requests');
         Schema::dropIfExists('quote_revision_tax_calculations');
@@ -107,12 +113,21 @@ function phase2c1Rollback(): void
         Schema::dropIfExists('organization_tax_profiles');
         phase2c1DropRevisionPointerColumns();
         Schema::enableForeignKeyConstraints();
-        DB::table('migrations')->whereIn('migration', PHASE_2C1_MIGRATIONS)->delete();
+        DB::table('migrations')->whereIn('migration', [
+            ...PHASE_2C1_MIGRATIONS,
+            '2026_07_28_140524_create_quote_revision_documents_table',
+            '2026_07_28_140525_create_quote_deliveries_table',
+            '2026_07_28_140526_create_quote_delivery_events_table',
+            '2026_07_28_140527_create_quote_customer_access_tokens_table',
+            '2026_07_28_140528_create_quote_customer_response_events_table',
+            '2026_07_28_140529_create_integration_outbox_table',
+        ])->delete();
 
         return;
     }
 
-    Artisan::call('migrate:rollback', ['--step' => 6, '--force' => true]);
+    // Phase 2D.1 (6) + Phase 2C.1 (6).
+    Artisan::call('migrate:rollback', ['--step' => 12, '--force' => true]);
 }
 
 /**
@@ -124,7 +139,7 @@ function phase2c1DropRevisionPointerColumns(): void
 {
     $keptColumns = array_flip(array_diff(
         Schema::getColumnListing('quote_revisions'),
-        ['current_tax_calculation_id', 'current_approval_request_id'],
+        ['current_tax_calculation_id', 'current_approval_request_id', 'current_document_id'],
     ));
 
     $rows = DB::table('quote_revisions')->get()->map(
