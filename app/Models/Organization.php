@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -86,5 +87,21 @@ class Organization extends Model
     public function numberSequences(): HasMany
     {
         return $this->hasMany(NumberSequence::class);
+    }
+
+    /**
+     * @return HasOne<OrganizationTaxProfile, $this>
+     */
+    public function taxProfile(): HasOne
+    {
+        return $this->hasOne(OrganizationTaxProfile::class);
+    }
+
+    /**
+     * @return HasMany<OrganizationTaxRate, $this>
+     */
+    public function taxRates(): HasMany
+    {
+        return $this->hasMany(OrganizationTaxRate::class);
     }
 }

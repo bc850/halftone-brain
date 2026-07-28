@@ -65,8 +65,8 @@ function phase0fHasUniqueTeamUserPivot(): bool
 
 function phase0fRollbackDropMigration(): void
 {
-    // Phase 1C.7D (1) + Phase 1C.7A (4) + Phase 1C.6A (2) + Phase 1C.4 (3) + Phase 1A (2) + Phase 0F (1).
-    Artisan::call('migrate:rollback', ['--step' => 21, '--force' => true]);
+    // Phase 2C.1 (6) + Phase 2B.1 (4) + Phase 2A (4) + Phase 1C.7D (1) + Phase 1C.7A (4) + Phase 1C.6A (2) + Phase 1C.4 (3) + Phase 1A (2) + Phase 0F (1).
+    Artisan::call('migrate:rollback', ['--step' => 27, '--force' => true]);
 }
 
 function phase0fSeedTeamAndUser(): array
@@ -92,7 +92,7 @@ test('fully migrated schema drops team_user and retains team_memberships plus le
 });
 
 test('migrate pretend for pending team_user drop succeeds without schema change', function () {
-    Artisan::call('migrate:rollback', ['--step' => 21, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 27, '--force' => true]);
 
     expect(Schema::hasTable('team_user'))->toBeTrue()
         ->and(DB::table('migrations')->where('migration', PHASE_0F_DROP_TEAM_USER)->exists())->toBeFalse();
@@ -115,7 +115,7 @@ test('migrate pretend for pending team_user drop succeeds without schema change'
 test('empty team_user drops successfully and remigration drops again after rollback', function () {
     expect(Schema::hasTable('team_user'))->toBeFalse();
 
-    Artisan::call('migrate:rollback', ['--step' => 21, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 27, '--force' => true]);
     expect(Schema::hasTable('team_user'))->toBeTrue()
         ->and(phase0fHasUniqueTeamUserPivot())->toBeTrue();
 
@@ -154,7 +154,7 @@ test('empty team_user drops successfully and remigration drops again after rollb
 });
 
 test('nonempty team_user blocks migration and leaves rows intact', function () {
-    Artisan::call('migrate:rollback', ['--step' => 21, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 27, '--force' => true]);
     expect(Schema::hasTable('team_user'))->toBeTrue();
 
     $seed = phase0fSeedTeamAndUser();

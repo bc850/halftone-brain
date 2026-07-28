@@ -19,6 +19,9 @@ final class Money
     /** Basis points representing 100%. */
     public const BASIS_POINTS_PER_UNIT = 10_000;
 
+    /** Denominator for parts-per-million rates, so 8% is 80,000 ppm. */
+    public const RATE_PARTS_PER_MILLION = 1_000_000;
+
     /**
      * Convert a decimal dollar amount to integer cents (half-up rounding).
      */
@@ -146,6 +149,50 @@ final class Money
         return self::intFromNumericString(
             self::roundScaled($raw, 0),
             'Basis-point micro-unit result overflows integer range.',
+        );
+    }
+
+    /**
+     * Apply a parts-per-million rate to a cent amount and round half-up to cents.
+     *
+     * result = round_half_up(cents × rate_ppm / 1,000,000)
+     */
+    public static function applyRatePartsPerMillionToCents(int $cents, int $ratePpm): int
+    {
+        if ($cents < 0 || $ratePpm < 0) {
+            throw new InvalidArgumentException('Cents and parts-per-million rate cannot be negative.');
+        }
+
+        $product = bcmul((string) $cents, (string) $ratePpm, 0);
+        $raw = bcdiv($product, (string) self::RATE_PARTS_PER_MILLION, 8);
+
+        return self::intFromNumericString(
+            self::roundScaled($raw, 0),
+            'Tax amount overflows integer range.',
+        );
+    }
+
+    /**
+     * Proportional share of an amount, rounded half-up.
+     *
+     * share = round_half_up(amount × numerator / denominator)
+     */
+    public static function proportionalShareOfCents(int $amountCents, int $numeratorCents, int $denominatorCents): int
+    {
+        if ($amountCents < 0 || $numeratorCents < 0 || $denominatorCents < 0) {
+            throw new InvalidArgumentException('Proportional share inputs cannot be negative.');
+        }
+
+        if ($denominatorCents === 0) {
+            throw new InvalidArgumentException('Proportional share denominator cannot be zero.');
+        }
+
+        $product = bcmul((string) $amountCents, (string) $numeratorCents, 0);
+        $raw = bcdiv($product, (string) $denominatorCents, 8);
+
+        return self::intFromNumericString(
+            self::roundScaled($raw, 0),
+            'Proportional share overflows integer range.',
         );
     }
 

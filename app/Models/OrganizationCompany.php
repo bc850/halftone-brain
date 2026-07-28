@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -88,5 +89,13 @@ class OrganizationCompany extends Model
     public function salesOwnerMembership(): BelongsTo
     {
         return $this->belongsTo(Membership::class, 'sales_owner_membership_id');
+    }
+
+    /**
+     * @return HasMany<OrganizationCompanyTaxCertificate, $this>
+     */
+    public function taxCertificates(): HasMany
+    {
+        return $this->hasMany(OrganizationCompanyTaxCertificate::class);
     }
 }

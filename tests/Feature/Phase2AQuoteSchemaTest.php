@@ -107,7 +107,8 @@ function phase2aRollback(): void
         return;
     }
 
-    Artisan::call('migrate:rollback', ['--step' => 8, '--force' => true]);
+    // Phase 2C.1 (6) + Phase 2B.1 (4) + Phase 2A (4).
+    Artisan::call('migrate:rollback', ['--step' => 14, '--force' => true]);
 }
 
 function phase2aRemigrate(): void

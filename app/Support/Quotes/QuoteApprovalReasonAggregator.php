@@ -13,12 +13,17 @@ use App\Support\Quotes\Totals\QuoteTotalsResult;
  * Aggregates line, adjustment, and monetary approval triggers into the
  * `approval_reason_snapshot` payload persisted on a quote revision.
  *
- * Customer-risk reasons (new/flagged customer) arrive in 2C through
- * `$additionalReasons` so line-level aggregation never has to be rewritten.
+ * Customer-risk reasons (new/flagged customer) are produced by
+ * `QuoteApprovalEvaluator` and arrive here through `$additionalReasons`, so
+ * line-level aggregation never has to be rewritten.
  */
 final class QuoteApprovalReasonAggregator
 {
     public const REASON_OVER_THRESHOLD = 'over_threshold';
+
+    public const REASON_NEW_CUSTOMER = 'new_customer';
+
+    public const REASON_FLAGGED_CUSTOMER = 'flagged_customer';
 
     public const REASON_CUSTOM_LINE = 'custom_line';
 
@@ -32,6 +37,8 @@ final class QuoteApprovalReasonAggregator
 
     public const REASON_LINE_DISCOUNT = 'line_discount';
 
+    public const REASON_MANUAL_ESCALATION = 'manual_escalation';
+
     /**
      * Stable presentation order for known reasons; unknown reasons keep insertion order after these.
      *
@@ -39,12 +46,15 @@ final class QuoteApprovalReasonAggregator
      */
     private const REASON_ORDER = [
         self::REASON_OVER_THRESHOLD,
+        self::REASON_NEW_CUSTOMER,
+        self::REASON_FLAGGED_CUSTOMER,
         self::REASON_CUSTOM_LINE,
         self::REASON_PRICE_OVERRIDE,
         self::REASON_BELOW_MINIMUM,
         self::REASON_MARGIN_OVERRIDE,
         self::REASON_LINE_DISCOUNT,
         self::REASON_QUOTE_DISCOUNT,
+        self::REASON_MANUAL_ESCALATION,
     ];
 
     /**
@@ -82,7 +92,7 @@ final class QuoteApprovalReasonAggregator
         }
 
         return [
-            'reasons' => $this->normalize($reasons),
+            'reasons' => self::sortReasons($reasons),
             'threshold_basis_cents' => $totals->approvalThresholdBasisCents,
             'meets_monetary_threshold' => $totals->meetsApprovalThreshold,
         ];
@@ -121,7 +131,7 @@ final class QuoteApprovalReasonAggregator
             $reasons[] = $reason;
         }
 
-        return $this->normalize($reasons);
+        return self::sortReasons($reasons);
     }
 
     /**
@@ -139,7 +149,7 @@ final class QuoteApprovalReasonAggregator
             $reasons[] = $reason;
         }
 
-        return $this->normalize($reasons);
+        return self::sortReasons($reasons);
     }
 
     /**
@@ -175,10 +185,12 @@ final class QuoteApprovalReasonAggregator
     }
 
     /**
+     * Dedupe and order reasons using the canonical presentation order.
+     *
      * @param  list<string>  $reasons
      * @return list<string>
      */
-    private function normalize(array $reasons): array
+    public static function sortReasons(array $reasons): array
     {
         $unique = array_values(array_unique($reasons));
 

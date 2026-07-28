@@ -68,8 +68,8 @@ function phase1c7dForeignOnDelete(string $table, array $columns, string $foreign
 
 function phase1c7dRollbackDrop(): void
 {
-    // Phase 2A (4) + Phase 1C.7D (1).
-    Artisan::call('migrate:rollback', ['--step' => 9, '--force' => true]);
+    // Phase 2C.1 (6) + Phase 2B.1 (4) + Phase 2A (4) + Phase 1C.7D (1).
+    Artisan::call('migrate:rollback', ['--step' => 15, '--force' => true]);
 }
 
 /**

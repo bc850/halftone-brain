@@ -97,6 +97,14 @@ final class CustomerSafeQuoteProjection
      */
     public static function forbiddenKeys(): array
     {
+        return array_values(array_unique(array_merge(self::quoteForbiddenKeys(), CustomerSafeTaxProjection::forbiddenKeys())));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function quoteForbiddenKeys(): array
+    {
         return [
             'material_cost_micro_units',
             'labor_cost_micro_units',

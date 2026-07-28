@@ -40,6 +40,8 @@ use Illuminate\Support\Carbon;
  * @property QuoteTaxCalculationStatus $tax_calculation_status
  * @property array<string, mixed>|null $tax_snapshot_json
  * @property Carbon|null $tax_calculated_at
+ * @property int|null $current_tax_calculation_id
+ * @property int|null $current_approval_request_id
  * @property int|null $requested_deposit_cents
  * @property bool $approval_required
  * @property array<string, mixed>|null $approval_reason_snapshot
@@ -77,6 +79,8 @@ use Illuminate\Support\Carbon;
     'tax_calculation_status',
     'tax_snapshot_json',
     'tax_calculated_at',
+    'current_tax_calculation_id',
+    'current_approval_request_id',
     'requested_deposit_cents',
     'approval_required',
     'approval_reason_snapshot',
@@ -99,6 +103,10 @@ class QuoteRevision extends Model
     /**
      * Customer-visible / financial snapshot fields — locked after send.
      *
+     * The tax and approval pointers appear here and in LIFECYCLE_FIELDS: a status
+     * transition may move them, but nothing may repoint them once the revision is
+     * customer-visible.
+     *
      * @var list<string>
      */
     public const CONTENT_FIELDS = [
@@ -117,6 +125,8 @@ class QuoteRevision extends Model
         'tax_calculation_status',
         'tax_snapshot_json',
         'tax_calculated_at',
+        'current_tax_calculation_id',
+        'current_approval_request_id',
         'requested_deposit_cents',
         'approval_required',
         'approval_reason_snapshot',
@@ -134,6 +144,8 @@ class QuoteRevision extends Model
     public const LIFECYCLE_FIELDS = [
         'status',
         'lock_version',
+        'current_tax_calculation_id',
+        'current_approval_request_id',
         'sent_at',
         'viewed_at',
         'accepted_at',
@@ -218,6 +230,8 @@ class QuoteRevision extends Model
             'tax_calculation_status' => QuoteTaxCalculationStatus::class,
             'tax_snapshot_json' => 'array',
             'tax_calculated_at' => 'datetime',
+            'current_tax_calculation_id' => 'integer',
+            'current_approval_request_id' => 'integer',
             'requested_deposit_cents' => 'integer',
             'approval_required' => 'boolean',
             'approval_reason_snapshot' => 'array',
@@ -278,6 +292,38 @@ class QuoteRevision extends Model
     public function partySnapshot(): HasOne
     {
         return $this->hasOne(QuoteRevisionPartySnapshot::class);
+    }
+
+    /**
+     * @return HasMany<QuoteRevisionTaxCalculation, $this>
+     */
+    public function taxCalculations(): HasMany
+    {
+        return $this->hasMany(QuoteRevisionTaxCalculation::class)->orderBy('calculation_version');
+    }
+
+    /**
+     * @return BelongsTo<QuoteRevisionTaxCalculation, $this>
+     */
+    public function currentTaxCalculation(): BelongsTo
+    {
+        return $this->belongsTo(QuoteRevisionTaxCalculation::class, 'current_tax_calculation_id');
+    }
+
+    /**
+     * @return HasMany<QuoteApprovalRequest, $this>
+     */
+    public function approvalRequests(): HasMany
+    {
+        return $this->hasMany(QuoteApprovalRequest::class)->orderBy('request_version');
+    }
+
+    /**
+     * @return BelongsTo<QuoteApprovalRequest, $this>
+     */
+    public function currentApprovalRequest(): BelongsTo
+    {
+        return $this->belongsTo(QuoteApprovalRequest::class, 'current_approval_request_id');
     }
 
     /**

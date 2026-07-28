@@ -40,6 +40,13 @@ final class RbacDefinitions
             ['key' => 'crm.quote.update', 'module' => 'crm', 'description' => 'Update draft quotes and revisions'],
             ['key' => 'crm.quote.void', 'module' => 'crm', 'description' => 'Void quotes'],
 
+            // Organization CRM — quote tax and approval (Phase 2C.1)
+            ['key' => 'crm.quote.approve', 'module' => 'crm', 'description' => 'Approve or reject quote approval requests'],
+            ['key' => 'crm.quote.tax_calculate', 'module' => 'crm', 'description' => 'Calculate quote tax from configured rates'],
+            ['key' => 'crm.quote.tax_override', 'module' => 'crm', 'description' => 'Manually override calculated quote tax'],
+            ['key' => 'crm.tax_certificate.view', 'module' => 'crm', 'description' => 'View customer exemption certificates'],
+            ['key' => 'crm.tax_certificate.manage', 'module' => 'crm', 'description' => 'Create, update, and verify customer exemption certificates'],
+
             // OrganizationCompany
             ['key' => 'crm.org_company.view', 'module' => 'crm', 'description' => 'View organization-company relationships'],
             ['key' => 'crm.org_company.create', 'module' => 'crm', 'description' => 'Associate companies with the organization'],
@@ -106,6 +113,8 @@ final class RbacDefinitions
             'crm.contact.view', 'crm.contact.view_all', 'crm.contact.create', 'crm.contact.update', 'crm.contact.delete',
             'crm.deal.view', 'crm.deal.view_all', 'crm.deal.create', 'crm.deal.update', 'crm.deal.delete', 'crm.deal.reassign',
             'crm.quote.view', 'crm.quote.view_all', 'crm.quote.create', 'crm.quote.update', 'crm.quote.void',
+            'crm.quote.approve', 'crm.quote.tax_calculate', 'crm.quote.tax_override',
+            'crm.tax_certificate.view', 'crm.tax_certificate.manage',
             'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update', 'crm.org_company.delete',
             'catalog.product.view', 'catalog.product.create', 'catalog.product.update', 'catalog.product.delete', 'catalog.product.view_cost',
             'catalog.org_product.manage', 'catalog.org_product.manage_pricing', 'catalog.org_product.override_price',
@@ -171,6 +180,8 @@ final class RbacDefinitions
                     'crm.contact.view', 'crm.contact.view_all', 'crm.contact.create', 'crm.contact.update',
                     'crm.deal.view', 'crm.deal.view_all', 'crm.deal.create', 'crm.deal.update', 'crm.deal.reassign',
                     'crm.quote.view', 'crm.quote.view_all', 'crm.quote.create', 'crm.quote.update', 'crm.quote.void',
+                    'crm.quote.approve', 'crm.quote.tax_calculate',
+                    'crm.tax_certificate.view',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                     'catalog.org_product.override_price', 'catalog.org_product.override_margin',
@@ -186,6 +197,8 @@ final class RbacDefinitions
                     'crm.contact.view', 'crm.contact.create', 'crm.contact.update',
                     'crm.deal.view', 'crm.deal.create', 'crm.deal.update',
                     'crm.quote.view', 'crm.quote.create', 'crm.quote.update',
+                    'crm.quote.tax_calculate',
+                    'crm.tax_certificate.view',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                 ],
@@ -193,6 +206,9 @@ final class RbacDefinitions
             'project_manager' => [
                 'name' => 'Project Manager',
                 'scope' => 'system',
+                // No crm.tax_certificate.view: project managers never need certificate
+                // numbers to run a job, and the customer detail they do need is already
+                // covered by crm.org_company.view.
                 'permissions' => [
                     'crm.company.view', 'crm.contact.view',
                     'crm.deal.view', 'crm.deal.view_all', 'crm.deal.update',
@@ -220,6 +236,8 @@ final class RbacDefinitions
                     'crm.contact.view', 'crm.contact.view_all',
                     'crm.deal.view', 'crm.deal.view_all',
                     'crm.quote.view', 'crm.quote.view_all',
+                    'crm.quote.tax_calculate', 'crm.quote.tax_override',
+                    'crm.tax_certificate.view', 'crm.tax_certificate.manage',
                     'crm.org_company.view',
                     'catalog.product.view', 'catalog.product.view_cost',
                     'catalog.org_product.manage_pricing',
