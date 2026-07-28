@@ -78,6 +78,26 @@ final class CustomerQuoteDocumentIntegrity
     }
 
     /**
+     * Stable identity string for a revision document version.
+     */
+    public function documentVersionIdentity(int $quoteRevisionId, string $documentType, int $documentVersion): string
+    {
+        return $quoteRevisionId.':'.$documentType.':'.$documentVersion;
+    }
+
+    /**
+     * @param  array<string, mixed>|list<mixed>  $payload
+     * @param  array<string, mixed>|list<mixed>  $shownPayload
+     */
+    public function assertResponseMatchesShownDocument(array $payload, array $shownPayload): void
+    {
+        $this->assertResponseMatchesDocument(
+            $this->payloadChecksum($payload),
+            $this->payloadChecksum($shownPayload),
+        );
+    }
+
+    /**
      * @throws InvalidArgumentException when the response checksum does not match
      */
     public function assertResponseMatchesDocument(string $responseChecksum, string $documentChecksum): void

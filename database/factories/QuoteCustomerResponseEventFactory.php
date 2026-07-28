@@ -59,4 +59,15 @@ class QuoteCustomerResponseEventFactory extends Factory
             'rejection_reason' => $reason,
         ]);
     }
+
+    public function employeeRecorded(int $membershipId, int $userId, string $reason = 'Customer confirmed by phone'): static
+    {
+        return $this->state(fn (): array => [
+            'source' => QuoteCustomerResponseSource::Employee,
+            'quote_customer_access_token_id' => null,
+            'employee_membership_id' => $membershipId,
+            'employee_user_id' => $userId,
+            'employee_recorded_reason' => $reason,
+        ]);
+    }
 }

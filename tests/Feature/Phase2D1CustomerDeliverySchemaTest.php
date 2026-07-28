@@ -362,6 +362,45 @@ test('phase 2d1 customer responses are append-only unique and require terms for 
     ]))->toThrow(QueryException::class);
 });
 
+test('phase 2d1 employee-recorded responses require actor and encrypted evidence', function () {
+    $quote = QuoteFactory::createForDeal();
+    $document = QuoteRevisionDocument::factory()->create([
+        'quote_revision_id' => $quote->current_revision_id,
+    ]);
+    $membership = $quote->createdByMembership()->firstOrFail();
+
+    expect(fn () => QuoteCustomerResponseEvent::factory()->create([
+        'quote_revision_document_id' => $document->id,
+        'source' => QuoteCustomerResponseSource::Employee,
+        'employee_membership_id' => null,
+        'employee_user_id' => null,
+        'employee_recorded_reason' => 'phone confirmation',
+    ]))->toThrow(LogicException::class, 'authorized employee actor');
+
+    expect(fn () => QuoteCustomerResponseEvent::factory()->create([
+        'quote_revision_document_id' => $document->id,
+        'source' => QuoteCustomerResponseSource::Employee,
+        'employee_membership_id' => $membership->id,
+        'employee_user_id' => $membership->user_id,
+        'employee_recorded_reason' => '   ',
+    ]))->toThrow(LogicException::class, 'evidence or a reason');
+
+    $response = QuoteCustomerResponseEvent::factory()
+        ->employeeRecorded($membership->id, $membership->user_id, 'Customer confirmed by phone')
+        ->create([
+            'quote_revision_document_id' => $document->id,
+        ]);
+
+    expect($response->employee_recorded_reason)->toBe('Customer confirmed by phone');
+
+    $rawReason = DB::table('quote_customer_response_events')
+        ->where('id', $response->id)
+        ->value('employee_recorded_reason');
+
+    expect($rawReason)->not->toBe('Customer confirmed by phone')
+        ->and($rawReason)->not->toBeNull();
+});
+
 test('phase 2d1 outbox idempotency is unique and status is not mass-assignable', function () {
     $row = IntegrationOutbox::factory()->create();
 

@@ -90,6 +90,16 @@ class QuoteCustomerResponseEvent extends Model
                 }
             }
 
+            if ($event->source === QuoteCustomerResponseSource::Employee) {
+                if ($event->employee_membership_id === null || $event->employee_user_id === null) {
+                    throw new LogicException('Employee-recorded responses require an authorized employee actor.');
+                }
+
+                if (trim((string) $event->employee_recorded_reason) === '') {
+                    throw new LogicException('Employee-recorded responses require evidence or a reason.');
+                }
+            }
+
             if ($event->user_agent !== null && strlen($event->user_agent) > 512) {
                 throw new LogicException('Quote customer response user_agent may not exceed 512 characters.');
             }
@@ -113,6 +123,7 @@ class QuoteCustomerResponseEvent extends Model
             'response' => QuoteCustomerResponseType::class,
             'source' => QuoteCustomerResponseSource::class,
             'terms_accepted' => 'boolean',
+            'employee_recorded_reason' => 'encrypted',
             'ip_address_encrypted' => 'encrypted',
             'occurred_at' => 'datetime',
         ];
