@@ -3,6 +3,7 @@
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
+use App\Http\Controllers\IntegrationOutboxController;
 use App\Http\Controllers\OrganizationCompanyTaxCertificateController;
 use App\Http\Controllers\OrganizationProductController;
 use App\Http\Controllers\OrganizationProductSourceController;
@@ -196,6 +197,17 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
             ->name('quote-approvals.approve');
         Route::post('quote-approvals/{approvalRequest}/reject', [QuoteApprovalQueueController::class, 'reject'])
             ->name('quote-approvals.reject');
+
+        Route::prefix('integrations/outbox')
+            ->name('integrations.outbox.')
+            ->group(function (): void {
+                Route::get('/', [IntegrationOutboxController::class, 'index'])->name('index');
+                Route::get('health', [IntegrationOutboxController::class, 'health'])->name('health');
+                Route::get('events/{outboxEvent}', [IntegrationOutboxController::class, 'showEvent'])->name('events.show');
+                Route::get('deliveries/{outboxDelivery}', [IntegrationOutboxController::class, 'showDelivery'])->name('deliveries.show');
+                Route::post('deliveries/{outboxDelivery}/replay', [IntegrationOutboxController::class, 'replay'])->name('deliveries.replay');
+                Route::post('deliveries/{outboxDelivery}/abandon', [IntegrationOutboxController::class, 'abandon'])->name('deliveries.abandon');
+            });
 
         Route::prefix('tax-settings')
             ->name('tax-settings.')

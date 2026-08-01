@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Models\Deal;
+use App\Models\IntegrationOutbox;
+use App\Models\IntegrationOutboxDelivery;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
 use App\Models\OrganizationCompanyTaxCertificate;
@@ -285,6 +287,34 @@ class AppServiceProvider extends ServiceProvider
             return QuoteApprovalRequest::query()
                 ->whereKey($value)
                 ->where('organization_id', TenantContext::get()->organizationId)
+                ->firstOrFail();
+        });
+
+        Route::bind('outboxEvent', function (string $value): IntegrationOutbox {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            $tenant = TenantContext::get();
+
+            return IntegrationOutbox::query()
+                ->whereKey($value)
+                ->where('organization_id', $tenant->organizationId)
+                ->where('parent_account_id', $tenant->parentAccountId)
+                ->firstOrFail();
+        });
+
+        Route::bind('outboxDelivery', function (string $value): IntegrationOutboxDelivery {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            $tenant = TenantContext::get();
+
+            return IntegrationOutboxDelivery::query()
+                ->whereKey($value)
+                ->where('organization_id', $tenant->organizationId)
+                ->where('parent_account_id', $tenant->parentAccountId)
                 ->firstOrFail();
         });
 

@@ -8,15 +8,19 @@ use App\Models\Organization;
 use App\Models\ParentAccount;
 use App\Models\User;
 use App\Support\Audit\Auditor;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use RuntimeException;
 
 /**
- * Authorization-ready service boundaries for replay/abandon (no admin UI yet).
+ * Authorization-ready service boundaries for delivery replay and abandon.
  */
 final class IntegrationDeliveryLifecycleService
 {
+    public const AUDIT_REPLAYED = 'integrations.outbox.delivery_replayed';
+
+    public const AUDIT_ABANDONED = 'integrations.outbox.delivery_abandoned';
+
     public function __construct(
         private Auditor $auditor,
         private IntegrationErrorSanitizer $sanitizer,
@@ -27,12 +31,22 @@ final class IntegrationDeliveryLifecycleService
      */
     public function replay(
         IntegrationOutboxDelivery $delivery,
+        string $reason,
         ?User $actor = null,
         bool $resetAttempts = false,
+        ?string $expectedStatus = null,
     ): IntegrationOutboxDelivery {
-        return DB::transaction(function () use ($delivery, $actor, $resetAttempts): IntegrationOutboxDelivery {
+        $reason = $this->requireReason($reason);
+
+        return DB::transaction(function () use ($delivery, $reason, $actor, $resetAttempts, $expectedStatus): IntegrationOutboxDelivery {
             /** @var IntegrationOutboxDelivery $locked */
             $locked = IntegrationOutboxDelivery::query()->whereKey($delivery->id)->lockForUpdate()->firstOrFail();
+
+            if ($expectedStatus !== null && $locked->status->value !== $expectedStatus) {
+                throw new StaleIntegrationDeliveryStateException(
+                    'Delivery status changed before replay could be applied.',
+                );
+            }
 
             $replayable = [
                 IntegrationOutboxDeliveryStatus::Failed,
@@ -41,7 +55,7 @@ final class IntegrationDeliveryLifecycleService
             ];
 
             if (! in_array($locked->status, $replayable, true)) {
-                throw new RuntimeException(
+                throw new StaleIntegrationDeliveryStateException(
                     "Delivery [{$locked->id}] status [{$locked->status->value}] is not replayable.",
                 );
             }
@@ -50,7 +64,6 @@ final class IntegrationDeliveryLifecycleService
                 'status' => $locked->status->value,
                 'attempt_count' => $locked->attempt_count,
                 'last_error_code' => $locked->last_error_code,
-                'last_error_message' => $locked->last_error_message,
                 'blocked_at' => $locked->blocked_at?->toIso8601String(),
             ];
 
@@ -66,7 +79,7 @@ final class IntegrationDeliveryLifecycleService
 
             $this->appendAudit(
                 $locked,
-                'integrations.outbox_delivery.replayed',
+                self::AUDIT_REPLAYED,
                 $actor,
                 $before,
                 [
@@ -75,6 +88,8 @@ final class IntegrationDeliveryLifecycleService
                     'reset_attempts' => $resetAttempts,
                     'prior_attempt_count' => $before['attempt_count'],
                     'prior_status' => $before['status'],
+                    'prior_error_code' => $before['last_error_code'],
+                    'reason' => $reason,
                 ],
             );
 
@@ -89,12 +104,31 @@ final class IntegrationDeliveryLifecycleService
         IntegrationOutboxDelivery $delivery,
         string $reason,
         ?User $actor = null,
+        ?string $expectedStatus = null,
     ): IntegrationOutboxDelivery {
-        $reason = $this->sanitizer->message($reason) ?? 'abandoned';
+        $reason = $this->requireReason($reason);
 
-        return DB::transaction(function () use ($delivery, $reason, $actor): IntegrationOutboxDelivery {
+        return DB::transaction(function () use ($delivery, $reason, $actor, $expectedStatus): IntegrationOutboxDelivery {
             /** @var IntegrationOutboxDelivery $locked */
             $locked = IntegrationOutboxDelivery::query()->whereKey($delivery->id)->lockForUpdate()->firstOrFail();
+
+            if ($expectedStatus !== null && $locked->status->value !== $expectedStatus) {
+                throw new StaleIntegrationDeliveryStateException(
+                    'Delivery status changed before abandon could be applied.',
+                );
+            }
+
+            if ($locked->status === IntegrationOutboxDeliveryStatus::Succeeded) {
+                throw new StaleIntegrationDeliveryStateException('Succeeded deliveries cannot be abandoned.');
+            }
+
+            if ($locked->status === IntegrationOutboxDeliveryStatus::Processing) {
+                if (! $this->leaseIsExpired($locked)) {
+                    throw new StaleIntegrationDeliveryStateException(
+                        'Actively leased deliveries cannot be abandoned until the lease expires and is reclaimed.',
+                    );
+                }
+            }
 
             $abandonable = [
                 IntegrationOutboxDeliveryStatus::Pending,
@@ -102,10 +136,11 @@ final class IntegrationDeliveryLifecycleService
                 IntegrationOutboxDeliveryStatus::Failed,
                 IntegrationOutboxDeliveryStatus::Dead,
                 IntegrationOutboxDeliveryStatus::BlockedConfiguration,
+                IntegrationOutboxDeliveryStatus::Processing,
             ];
 
             if (! in_array($locked->status, $abandonable, true)) {
-                throw new RuntimeException(
+                throw new StaleIntegrationDeliveryStateException(
                     "Delivery [{$locked->id}] status [{$locked->status->value}] cannot be abandoned.",
                 );
             }
@@ -113,6 +148,7 @@ final class IntegrationDeliveryLifecycleService
             $before = [
                 'status' => $locked->status->value,
                 'attempt_count' => $locked->attempt_count,
+                'last_error_code' => $locked->last_error_code,
             ];
 
             $locked->forceFill([
@@ -120,18 +156,20 @@ final class IntegrationDeliveryLifecycleService
                 'abandoned_at' => now(),
                 'locked_at' => null,
                 'locked_by_worker' => null,
+                'available_at' => now(),
                 'last_error_code' => $this->sanitizer->code('abandoned'),
                 'last_error_message' => $reason,
             ])->save();
 
             $this->appendAudit(
                 $locked,
-                'integrations.outbox_delivery.abandoned',
+                self::AUDIT_ABANDONED,
                 $actor,
                 $before,
                 [
                     'status' => $locked->status->value,
                     'reason' => $reason,
+                    'prior_status' => $before['status'],
                 ],
             );
 
@@ -195,6 +233,28 @@ final class IntegrationDeliveryLifecycleService
 
             return $count;
         });
+    }
+
+    private function leaseIsExpired(IntegrationOutboxDelivery $delivery): bool
+    {
+        if ($delivery->locked_at === null) {
+            return true;
+        }
+
+        $leaseSeconds = (int) config('integrations.deliveries.lease_seconds', 120);
+
+        return $delivery->locked_at->lte(Carbon::now()->subSeconds($leaseSeconds));
+    }
+
+    private function requireReason(string $reason): string
+    {
+        $sanitized = $this->sanitizer->message($reason);
+
+        if ($sanitized === null || strlen(trim($reason)) < 3) {
+            throw new InvalidArgumentException('A short operator reason is required.');
+        }
+
+        return $sanitized;
     }
 
     /**

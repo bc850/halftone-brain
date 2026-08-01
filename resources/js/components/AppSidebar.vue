@@ -10,6 +10,7 @@ import {
     Tags,
     Truck,
     Users,
+    Workflow,
 } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -36,6 +37,7 @@ import { index as orgCategoriesIndex } from '@/routes/org/categories';
 import { index as orgCompaniesIndex } from '@/routes/org/companies';
 import { index as orgContactsIndex } from '@/routes/org/contacts';
 import { index as orgDealsIndex } from '@/routes/org/deals';
+import { index as orgIntegrationsOutboxIndex } from '@/routes/org/integrations/outbox';
 import { index as orgProductsIndex } from '@/routes/org/products';
 import { index as orgApprovalQueueIndex } from '@/routes/org/quote-approvals';
 import { edit as orgTaxSettingsEdit } from '@/routes/org/tax-settings';
@@ -119,6 +121,14 @@ const mainNavItems = computed((): NavItem[] => {
             title: 'Tax settings',
             href: orgTaxSettingsEdit.url(slug),
             icon: Percent,
+        });
+    }
+
+    if (may('integrations.outbox.view')) {
+        items.push({
+            title: 'Integration activity',
+            href: orgIntegrationsOutboxIndex.url(slug),
+            icon: Workflow,
         });
     }
 

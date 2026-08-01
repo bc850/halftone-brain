@@ -51,6 +51,11 @@ final class RbacDefinitions
             ['key' => 'crm.quote.send', 'module' => 'crm', 'description' => 'Send customer quote documents and record manual delivery'],
             ['key' => 'crm.quote.record_customer_response', 'module' => 'crm', 'description' => 'Record an employee-entered customer quote acceptance or rejection'],
 
+            // Integrations — outbox operations (Phase 2E.2)
+            ['key' => 'integrations.outbox.view', 'module' => 'integrations', 'description' => 'View integration outbox and delivery activity'],
+            ['key' => 'integrations.outbox.replay', 'module' => 'integrations', 'description' => 'Replay failed, dead, or configuration-blocked integration deliveries'],
+            ['key' => 'integrations.outbox.abandon', 'module' => 'integrations', 'description' => 'Abandon eligible unsuccessful integration deliveries'],
+
             // OrganizationCompany
             ['key' => 'crm.org_company.view', 'module' => 'crm', 'description' => 'View organization-company relationships'],
             ['key' => 'crm.org_company.create', 'module' => 'crm', 'description' => 'Associate companies with the organization'],
@@ -120,6 +125,7 @@ final class RbacDefinitions
             'crm.quote.approve', 'crm.quote.tax_calculate', 'crm.quote.tax_override',
             'crm.tax_certificate.view', 'crm.tax_certificate.manage',
             'crm.quote.send', 'crm.quote.record_customer_response',
+            'integrations.outbox.view', 'integrations.outbox.replay', 'integrations.outbox.abandon',
             'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update', 'crm.org_company.delete',
             'catalog.product.view', 'catalog.product.create', 'catalog.product.update', 'catalog.product.delete', 'catalog.product.view_cost',
             'catalog.org_product.manage', 'catalog.org_product.manage_pricing', 'catalog.org_product.override_price',
@@ -188,6 +194,7 @@ final class RbacDefinitions
                     'crm.quote.approve', 'crm.quote.tax_calculate',
                     'crm.tax_certificate.view',
                     'crm.quote.send', 'crm.quote.record_customer_response',
+                    'integrations.outbox.view',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                     'catalog.org_product.override_price', 'catalog.org_product.override_margin',

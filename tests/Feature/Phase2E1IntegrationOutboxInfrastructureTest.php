@@ -19,6 +19,7 @@ use App\Support\Integrations\Outbox\IntegrationLeaseReclaimer;
 use App\Support\Integrations\Outbox\IntegrationOutboxBackoff;
 use App\Support\Integrations\Outbox\IntegrationOutboxHealthReporter;
 use App\Support\Integrations\Outbox\IntegrationOutboxMaterializer;
+use App\Support\Integrations\Outbox\StaleIntegrationDeliveryStateException;
 use App\Support\Quotes\Acceptance\QuoteAcceptanceAtomicityContract;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
@@ -335,16 +336,16 @@ test('phase 2e1 replay and abandon enforce state rules and audit', function () {
     ])->save();
 
     $lifecycle = app(IntegrationDeliveryLifecycleService::class);
-    $replayed = $lifecycle->replay($delivery, resetAttempts: false);
+    $replayed = $lifecycle->replay($delivery, reason: 'Operator retry after failure', resetAttempts: false);
 
     expect($replayed->status)->toBe(IntegrationOutboxDeliveryStatus::Pending)
         ->and($replayed->attempt_count)->toBe(4)
-        ->and(AuditEvent::query()->where('action', 'integrations.outbox_delivery.replayed')->count())->toBe(1);
+        ->and(AuditEvent::query()->where('action', 'integrations.outbox.delivery_replayed')->count())->toBe(1);
 
     $succeeded = $delivery->fresh();
     $succeeded->forceFill(['status' => IntegrationOutboxDeliveryStatus::Succeeded, 'succeeded_at' => now()])->save();
 
-    expect(fn () => $lifecycle->replay($succeeded))->toThrow(RuntimeException::class);
+    expect(fn () => $lifecycle->replay($succeeded, reason: 'should fail'))->toThrow(StaleIntegrationDeliveryStateException::class);
 
     $pending = IntegrationOutboxDelivery::factory()->create([
         'integration_outbox_id' => $outbox->id,
@@ -354,7 +355,7 @@ test('phase 2e1 replay and abandon enforce state rules and audit', function () {
 
     $abandoned = $lifecycle->abandon($pending, 'Owner abandoned poisoned row');
     expect($abandoned->status)->toBe(IntegrationOutboxDeliveryStatus::Abandoned)
-        ->and(AuditEvent::query()->where('action', 'integrations.outbox_delivery.abandoned')->count())->toBe(1);
+        ->and(AuditEvent::query()->where('action', 'integrations.outbox.delivery_abandoned')->count())->toBe(1);
 });
 
 test('phase 2e1 lease reclaim recovers crashed processing rows', function () {
