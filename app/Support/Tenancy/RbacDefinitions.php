@@ -56,6 +56,11 @@ final class RbacDefinitions
             ['key' => 'integrations.outbox.replay', 'module' => 'integrations', 'description' => 'Replay failed, dead, or configuration-blocked integration deliveries'],
             ['key' => 'integrations.outbox.abandon', 'module' => 'integrations', 'description' => 'Abandon eligible unsuccessful integration deliveries'],
 
+            // Integrations — provider settings (Phase 2E.3A definitions only; do not sync primary yet)
+            ['key' => 'integrations.settings.view', 'module' => 'integrations', 'description' => 'View organization integration provider settings'],
+            ['key' => 'integrations.settings.manage', 'module' => 'integrations', 'description' => 'Create and update organization integration provider settings'],
+            ['key' => 'integrations.settings.validate', 'module' => 'integrations', 'description' => 'Validate organization integration provider configuration'],
+
             // OrganizationCompany
             ['key' => 'crm.org_company.view', 'module' => 'crm', 'description' => 'View organization-company relationships'],
             ['key' => 'crm.org_company.create', 'module' => 'crm', 'description' => 'Associate companies with the organization'],
@@ -126,6 +131,7 @@ final class RbacDefinitions
             'crm.tax_certificate.view', 'crm.tax_certificate.manage',
             'crm.quote.send', 'crm.quote.record_customer_response',
             'integrations.outbox.view', 'integrations.outbox.replay', 'integrations.outbox.abandon',
+            'integrations.settings.view', 'integrations.settings.manage', 'integrations.settings.validate',
             'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update', 'crm.org_company.delete',
             'catalog.product.view', 'catalog.product.create', 'catalog.product.update', 'catalog.product.delete', 'catalog.product.view_cost',
             'catalog.org_product.manage', 'catalog.org_product.manage_pricing', 'catalog.org_product.override_price',
@@ -195,6 +201,7 @@ final class RbacDefinitions
                     'crm.tax_certificate.view',
                     'crm.quote.send', 'crm.quote.record_customer_response',
                     'integrations.outbox.view',
+                    'integrations.settings.view',
                     'crm.org_company.view', 'crm.org_company.create', 'crm.org_company.update',
                     'catalog.product.view', 'catalog.vendor.view', 'catalog.category.view',
                     'catalog.org_product.override_price', 'catalog.org_product.override_margin',

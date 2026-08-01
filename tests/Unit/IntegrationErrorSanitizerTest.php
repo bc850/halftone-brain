@@ -32,6 +32,11 @@ test('provider reference allowlist drops forbidden keys and bodies', function ()
         'raw' => ['nested' => true],
         'resource_type' => 'probe',
         'idempotency_key' => 'abc',
+        'remote_board_id' => 'board_1',
+        'remote_url' => 'https://monday.test/boards/1/pulses/2',
+        'provider_request_id' => 'req_1',
+        'idempotency_replayed' => true,
+        'api_version' => '2026-07',
     ]);
 
     expect($ref)->toBe([
@@ -39,5 +44,10 @@ test('provider reference allowlist drops forbidden keys and bodies', function ()
         'remote_id' => '123',
         'resource_type' => 'probe',
         'idempotency_key' => 'abc',
+        'remote_board_id' => 'board_1',
+        'remote_url' => 'https://monday.test/boards/1/pulses/2',
+        'provider_request_id' => 'req_1',
+        'idempotency_replayed' => true,
+        'api_version' => '2026-07',
     ]);
 });

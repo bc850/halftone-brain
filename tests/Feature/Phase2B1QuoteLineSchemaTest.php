@@ -95,8 +95,8 @@ function phase2b1Rollback(): void
         return;
     }
 
-    // Phase 2E.1 (1) + Phase 2D.1 (6) + Phase 2C.1 (6) + Phase 2B.1 (4).
-    Artisan::call('migrate:rollback', ['--step' => 17, '--force' => true]);
+    // Phase 2E.3A (2) + Phase 2E.1 (1) + Phase 2D.1 (6) + Phase 2C.1 (6) + Phase 2B.1 (4).
+    Artisan::call('migrate:rollback', ['--step' => 19, '--force' => true]);
 }
 
 test('phase 2b1 tables indexes and tax readiness columns exist', function () {

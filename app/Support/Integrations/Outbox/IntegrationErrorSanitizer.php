@@ -16,6 +16,11 @@ final class IntegrationErrorSanitizer
         'provider',
         'resource_type',
         'remote_id',
+        'remote_board_id',
+        'remote_url',
+        'provider_request_id',
+        'idempotency_replayed',
+        'api_version',
         'idempotency_key',
     ];
 
