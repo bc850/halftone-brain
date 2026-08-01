@@ -25,6 +25,9 @@ use App\Models\QuoteRevisionLineItem;
 use App\Models\Team;
 use App\Models\Vendor;
 use App\Models\VendorProductOffering;
+use App\Support\Integrations\Outbox\Consumers\DiagnosticAcceptedQuoteProbeConsumer;
+use App\Support\Integrations\Outbox\IntegrationConsumerRegistry;
+use App\Support\Quotes\Acceptance\QuoteAcceptanceAtomicityContract;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -37,7 +40,16 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(IntegrationConsumerRegistry::class, function (): IntegrationConsumerRegistry {
+            $registry = new IntegrationConsumerRegistry;
+            $registry->declareEventType(QuoteAcceptanceAtomicityContract::ACCEPTED_EVENT_TYPE);
+            $registry->register(
+                QuoteAcceptanceAtomicityContract::ACCEPTED_EVENT_TYPE,
+                new DiagnosticAcceptedQuoteProbeConsumer,
+            );
+
+            return $registry;
+        });
     }
 
     public function boot(): void

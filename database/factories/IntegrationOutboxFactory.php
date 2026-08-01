@@ -22,6 +22,9 @@ class IntegrationOutboxFactory extends Factory
     public function definition(): array
     {
         $revisionId = fake()->unique()->numberBetween(1, 1_000_000);
+        $quoteId = $revisionId + 1;
+        $documentId = $revisionId + 2;
+        $documentVersion = 1;
 
         return [
             'organization_id' => Organization::factory(),
@@ -32,10 +35,12 @@ class IntegrationOutboxFactory extends Factory
             'aggregate_id' => $revisionId,
             'event_type' => QuoteAcceptanceAtomicityContract::ACCEPTED_EVENT_TYPE,
             'schema_version' => 1,
-            'payload_json' => [
+            'payload_json' => fn (array $attributes): array => [
+                'quote_id' => $quoteId,
                 'quote_revision_id' => $revisionId,
-                'quote_id' => $revisionId + 1,
-                'organization_id' => 1,
+                'organization_id' => (int) $attributes['organization_id'],
+                'document_id' => $documentId,
+                'document_version' => $documentVersion,
             ],
             'idempotency_key' => (new QuoteAcceptanceAtomicityContract)->designIdempotencyKey($revisionId),
             'status' => IntegrationOutboxStatus::Pending,

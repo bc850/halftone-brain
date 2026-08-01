@@ -109,7 +109,7 @@ function phase2d1Rollback(): void
         return;
     }
 
-    Artisan::call('migrate:rollback', ['--step' => 6, '--force' => true]);
+    Artisan::call('migrate:rollback', ['--step' => 7, '--force' => true]);
 }
 
 /**

@@ -64,8 +64,8 @@ function phase1c7aHasForeign(string $table, string $name, array $columns, string
 
 function phase1c7aRollback(): void
 {
-    // Phase 2D.1 (6) + Phase 2C.1 (6) + Phase 2B.1 (4) + Phase 2A (4) + Phase 1C.7D (1) + Phase 1C.7A (4).
-    Artisan::call('migrate:rollback', ['--step' => 25, '--force' => true]);
+    // Phase 2E.1 (1) + Phase 2D.1 (6) + Phase 2C.1 (6) + Phase 2B.1 (4) + Phase 2A (4) + Phase 1C.7D (1) + Phase 1C.7A (4).
+    Artisan::call('migrate:rollback', ['--step' => 26, '--force' => true]);
 }
 
 function phase1c7aRemigrate(): void

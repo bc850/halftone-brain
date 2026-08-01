@@ -2,38 +2,37 @@
 
 namespace App\Models;
 
-use App\Enums\IntegrationOutboxStatus;
-use Database\Factories\IntegrationOutboxFactory;
+use App\Enums\IntegrationOutboxDeliveryStatus;
+use Database\Factories\IntegrationOutboxDeliveryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
- * Durable post-transaction integration outbox row.
+ * Per-consumer delivery state for an integration outbox event.
  *
- * Status is intentionally excluded from fillable so only a future dispatcher
- * may forceFill lifecycle transitions. Payloads must stay free of secrets.
+ * Lifecycle fields (status, locks, terminal timestamps, errors, provider refs)
+ * are intentionally excluded from fillable. Processors must forceFill transitions.
  *
  * @property int $id
  * @property int|null $parent_account_id
  * @property int|null $organization_id
- * @property string $aggregate_type
- * @property int $aggregate_id
- * @property string $event_type
- * @property int $schema_version
- * @property array<string, mixed> $payload_json
+ * @property int $integration_outbox_id
+ * @property string $consumer_key
  * @property string $idempotency_key
- * @property IntegrationOutboxStatus $status
+ * @property IntegrationOutboxDeliveryStatus $status
  * @property int $attempt_count
  * @property Carbon $available_at
  * @property Carbon|null $locked_at
  * @property string|null $locked_by_worker
- * @property Carbon|null $dispatched_at
+ * @property Carbon|null $succeeded_at
+ * @property Carbon|null $blocked_at
+ * @property Carbon|null $abandoned_at
  * @property string|null $last_error_code
  * @property string|null $last_error_message
+ * @property array<string, mixed>|null $provider_reference_json
  * @property string $correlation_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -41,34 +40,25 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'parent_account_id',
     'organization_id',
-    'aggregate_type',
-    'aggregate_id',
-    'event_type',
-    'schema_version',
-    'payload_json',
+    'integration_outbox_id',
+    'consumer_key',
     'idempotency_key',
     'attempt_count',
     'available_at',
-    'locked_at',
-    'locked_by_worker',
-    'dispatched_at',
-    'last_error_code',
-    'last_error_message',
     'correlation_id',
 ])]
-class IntegrationOutbox extends Model
+class IntegrationOutboxDelivery extends Model
 {
-    /** @use HasFactory<IntegrationOutboxFactory> */
+    /** @use HasFactory<IntegrationOutboxDeliveryFactory> */
     use HasFactory;
 
-    protected $table = 'integration_outbox';
+    protected $table = 'integration_outbox_deliveries';
 
     /**
      * @var array<string, mixed>
      */
     protected $attributes = [
         'status' => 'pending',
-        'schema_version' => 1,
         'attempt_count' => 0,
     ];
 
@@ -78,15 +68,23 @@ class IntegrationOutbox extends Model
     protected function casts(): array
     {
         return [
-            'status' => IntegrationOutboxStatus::class,
-            'payload_json' => 'array',
-            'schema_version' => 'integer',
-            'aggregate_id' => 'integer',
+            'status' => IntegrationOutboxDeliveryStatus::class,
             'attempt_count' => 'integer',
             'available_at' => 'datetime',
             'locked_at' => 'datetime',
-            'dispatched_at' => 'datetime',
+            'succeeded_at' => 'datetime',
+            'blocked_at' => 'datetime',
+            'abandoned_at' => 'datetime',
+            'provider_reference_json' => 'array',
         ];
+    }
+
+    /**
+     * @return BelongsTo<IntegrationOutbox, $this>
+     */
+    public function outbox(): BelongsTo
+    {
+        return $this->belongsTo(IntegrationOutbox::class, 'integration_outbox_id');
     }
 
     /**
@@ -103,13 +101,5 @@ class IntegrationOutbox extends Model
     public function parentAccount(): BelongsTo
     {
         return $this->belongsTo(ParentAccount::class);
-    }
-
-    /**
-     * @return HasMany<IntegrationOutboxDelivery, $this>
-     */
-    public function deliveries(): HasMany
-    {
-        return $this->hasMany(IntegrationOutboxDelivery::class, 'integration_outbox_id');
     }
 }
