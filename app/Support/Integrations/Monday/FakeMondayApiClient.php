@@ -53,7 +53,12 @@ final class FakeMondayApiClient implements MondayApiClientInterface
                 new MondayColumnMetadata('date_accepted', 'Accepted', MondayColumnType::Date),
                 new MondayColumnMetadata('numbers_grand_total', 'Grand Total', MondayColumnType::Numbers),
                 new MondayColumnMetadata('link_halftone', 'Halftone URL', MondayColumnType::Link),
-                new MondayColumnMetadata('status_intake', 'Intake Status', MondayColumnType::Status),
+                new MondayColumnMetadata(
+                    'status_intake',
+                    'Intake Status',
+                    MondayColumnType::Status,
+                    ['New Intake', 'In Progress', 'Done'],
+                ),
             ],
         );
 

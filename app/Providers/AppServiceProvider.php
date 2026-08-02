@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Enums\IntegrationProvider;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Models\Deal;
@@ -10,6 +11,7 @@ use App\Models\IntegrationOutboxDelivery;
 use App\Models\Organization;
 use App\Models\OrganizationCompany;
 use App\Models\OrganizationCompanyTaxCertificate;
+use App\Models\OrganizationIntegrationSetting;
 use App\Models\OrganizationProduct;
 use App\Models\OrganizationProductSource;
 use App\Models\OrganizationProductUnitConversion;
@@ -315,6 +317,21 @@ class AppServiceProvider extends ServiceProvider
                 ->whereKey($value)
                 ->where('organization_id', $tenant->organizationId)
                 ->where('parent_account_id', $tenant->parentAccountId)
+                ->firstOrFail();
+        });
+
+        Route::bind('mondaySetting', function (string $value): OrganizationIntegrationSetting {
+            if (! TenantContext::has()) {
+                abort(404);
+            }
+
+            $tenant = TenantContext::get();
+
+            return OrganizationIntegrationSetting::query()
+                ->whereKey($value)
+                ->where('organization_id', $tenant->organizationId)
+                ->where('parent_account_id', $tenant->parentAccountId)
+                ->where('provider', IntegrationProvider::Monday)
                 ->firstOrFail();
         });
 

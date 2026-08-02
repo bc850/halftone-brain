@@ -22,9 +22,8 @@ final class MondayItemNameTemplate
         return [
             '{'.MondayIntakeLogicalKey::QuoteNumber->value.'}',
             '{'.MondayIntakeLogicalKey::CompanyName->value.'}',
-            '{'.MondayIntakeLogicalKey::RevisionNumber->value.'}',
             '{'.MondayIntakeLogicalKey::Organization->value.'}',
-            '{'.MondayIntakeLogicalKey::IntegrationKey->value.'}',
+            '{'.MondayIntakeLogicalKey::RevisionNumber->value.'}',
         ];
     }
 

@@ -4,6 +4,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DealController;
 use App\Http\Controllers\IntegrationOutboxController;
+use App\Http\Controllers\MondayIntegrationSettingsController;
 use App\Http\Controllers\OrganizationCompanyTaxCertificateController;
 use App\Http\Controllers\OrganizationProductController;
 use App\Http\Controllers\OrganizationProductSourceController;
@@ -207,6 +208,18 @@ Route::middleware(['auth', 'verified', ResolveTenantContextFromRoute::class])
                 Route::get('deliveries/{outboxDelivery}', [IntegrationOutboxController::class, 'showDelivery'])->name('deliveries.show');
                 Route::post('deliveries/{outboxDelivery}/replay', [IntegrationOutboxController::class, 'replay'])->name('deliveries.replay');
                 Route::post('deliveries/{outboxDelivery}/abandon', [IntegrationOutboxController::class, 'abandon'])->name('deliveries.abandon');
+            });
+
+        Route::prefix('integrations/settings/monday')
+            ->name('integrations.settings.monday.')
+            ->group(function (): void {
+                Route::get('/', [MondayIntegrationSettingsController::class, 'show'])->name('show');
+                Route::post('/', [MondayIntegrationSettingsController::class, 'store'])->name('store');
+                Route::put('{mondaySetting}', [MondayIntegrationSettingsController::class, 'update'])->name('update');
+                Route::post('{mondaySetting}/validate', [MondayIntegrationSettingsController::class, 'validateConfiguration'])
+                    ->name('validate');
+                Route::post('{mondaySetting}/enable', [MondayIntegrationSettingsController::class, 'enable'])->name('enable');
+                Route::post('{mondaySetting}/disable', [MondayIntegrationSettingsController::class, 'disable'])->name('disable');
             });
 
         Route::prefix('tax-settings')
