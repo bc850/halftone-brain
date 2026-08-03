@@ -29,8 +29,16 @@ use App\Models\QuoteRevisionLineItem;
 use App\Models\Team;
 use App\Models\Vendor;
 use App\Models\VendorProductOffering;
+use App\Support\Integrations\Monday\Credentials\EnvMondayCredentialsProvider;
+use App\Support\Integrations\Monday\Credentials\MondayCredentialsProviderInterface;
+use App\Support\Integrations\Monday\HttpMondayApiClient;
+use App\Support\Integrations\Monday\MondayApiClientInterface;
+use App\Support\Integrations\Monday\MondayApiVersion;
+use App\Support\Integrations\Monday\MondayErrorClassifier;
+use App\Support\Integrations\Monday\UnavailableMondayApiClient;
 use App\Support\Integrations\Outbox\Consumers\DiagnosticAcceptedQuoteProbeConsumer;
 use App\Support\Integrations\Outbox\IntegrationConsumerRegistry;
+use App\Support\Integrations\Outbox\IntegrationErrorSanitizer;
 use App\Support\Quotes\Acceptance\QuoteAcceptanceAtomicityContract;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -52,7 +60,30 @@ class AppServiceProvider extends ServiceProvider
                 new DiagnosticAcceptedQuoteProbeConsumer,
             );
 
+            // monday.create_intake_item remains intentionally unregistered until a later checkpoint.
+
             return $registry;
+        });
+
+        $this->app->singleton(MondayCredentialsProviderInterface::class, EnvMondayCredentialsProvider::class);
+
+        $this->app->singleton(MondayApiClientInterface::class, function ($app): MondayApiClientInterface {
+            $credentials = $app->make(MondayCredentialsProviderInterface::class)->get();
+
+            if ($credentials === null) {
+                return new UnavailableMondayApiClient;
+            }
+
+            return new HttpMondayApiClient(
+                credentials: $credentials,
+                classifier: $app->make(MondayErrorClassifier::class),
+                sanitizer: $app->make(IntegrationErrorSanitizer::class),
+                apiUrl: (string) config('services.monday.api_url', 'https://api.monday.com/v2'),
+                apiVersion: (string) config('services.monday.api_version', MondayApiVersion::PINNED),
+                connectTimeoutSeconds: (int) config('services.monday.connect_timeout', 5),
+                timeoutSeconds: (int) config('services.monday.timeout', 20),
+                maxResponseBytes: (int) config('services.monday.max_response_bytes', 1048576),
+            );
         });
     }
 

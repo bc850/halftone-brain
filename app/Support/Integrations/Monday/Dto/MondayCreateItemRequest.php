@@ -7,7 +7,7 @@ use App\Support\Integrations\Monday\MondaySensitivePayloadGuard;
 /**
  * Sanitized create-item request. Must never carry tokens or internal secrets.
  *
- * @phpstan-type ColumnValueMap array<string, string|int|float|bool|null>
+ * @phpstan-type ColumnValueMap array<string, string|int|float|bool|array<string, mixed>|null>
  */
 final readonly class MondayCreateItemRequest
 {
@@ -21,6 +21,7 @@ final readonly class MondayCreateItemRequest
         public string $integrationKey,
         public array $columnValues,
         public string $apiVersion = '2026-07',
+        public ?string $idempotencyKey = null,
     ) {
         MondaySensitivePayloadGuard::assertNoSensitiveKeys([
             'board_id' => $this->boardId,
@@ -29,6 +30,16 @@ final readonly class MondayCreateItemRequest
             'integration_key' => $this->integrationKey,
             'column_values' => $this->columnValues,
             'api_version' => $this->apiVersion,
+            'idempotency_key' => $this->idempotencyKey,
         ]);
+    }
+
+    public function resolvedIdempotencyKey(): string
+    {
+        if (is_string($this->idempotencyKey) && trim($this->idempotencyKey) !== '') {
+            return trim($this->idempotencyKey);
+        }
+
+        return hash('sha256', $this->boardId.'|'.$this->integrationKey);
     }
 }

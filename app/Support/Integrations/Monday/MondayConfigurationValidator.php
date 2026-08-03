@@ -7,10 +7,10 @@ use App\Enums\MondayColumnType;
 use App\Enums\MondayIntakeLogicalKey;
 use App\Models\OrganizationIntegrationSetting;
 use App\Models\User;
+use App\Support\Integrations\Monday\Credentials\MondayCredentialsProviderInterface;
 use App\Support\Integrations\Monday\Dto\MondayBoardMetadata;
 use App\Support\Integrations\Monday\Dto\MondayColumnMetadata;
 use App\Support\Integrations\Outbox\IntegrationErrorSanitizer;
-use Illuminate\Contracts\Foundation\Application;
 use InvalidArgumentException;
 use Throwable;
 
@@ -21,7 +21,8 @@ use Throwable;
 final class MondayConfigurationValidator
 {
     public function __construct(
-        private Application $app,
+        private MondayApiClientInterface $client,
+        private MondayCredentialsProviderInterface $credentialsProvider,
         private MondayOrganizationSettingsService $settings,
         private IntegrationErrorSanitizer $sanitizer,
     ) {}
@@ -81,7 +82,9 @@ final class MondayConfigurationValidator
             );
         }
 
-        if (! $this->app->bound(MondayApiClientInterface::class)) {
+        $credentials = $this->credentialsProvider->get();
+
+        if ($credentials === null || $this->client instanceof UnavailableMondayApiClient) {
             return $this->settings->recordValidationOutcome(
                 settings: $settings,
                 expectedLockVersion: $expectedLockVersion,
@@ -94,12 +97,20 @@ final class MondayConfigurationValidator
             );
         }
 
-        /** @var MondayApiClientInterface $client */
-        $client = $this->app->make(MondayApiClientInterface::class);
-
         try {
-            $board = $client->inspectBoard($boardId);
+            $board = $this->client->inspectBoard($boardId);
         } catch (MondayApiClientException $exception) {
+            if ($exception->error->code === 'client_not_configured') {
+                return $this->settings->recordValidationOutcome(
+                    settings: $settings,
+                    expectedLockVersion: $expectedLockVersion,
+                    status: IntegrationValidationStatus::ClientNotConfigured,
+                    errorCode: $this->sanitizer->code('client_not_configured'),
+                    errorMessage: $this->sanitizer->message($exception->error->message),
+                    actor: $actor,
+                );
+            }
+
             return $this->settings->recordValidationOutcome(
                 settings: $settings,
                 expectedLockVersion: $expectedLockVersion,

@@ -34,6 +34,11 @@ final class FakeMondayApiClient implements MondayApiClientInterface
      */
     private array $itemsByIntegrationKey = [];
 
+    /**
+     * @var array<string, true>
+     */
+    private array $ambiguousKeys = [];
+
     private int $nextItemSequence = 1000;
 
     private ?string $nextFailure = null;
@@ -72,9 +77,19 @@ final class FakeMondayApiClient implements MondayApiClientInterface
         $this->boards[$board->id] = $board;
     }
 
+    public function seedItem(string $integrationKey, MondayCreatedItemResult $result): void
+    {
+        $this->itemsByIntegrationKey[$integrationKey] = $result;
+    }
+
+    public function seedAmbiguousIntegrationKey(string $integrationKey): void
+    {
+        $this->ambiguousKeys[$integrationKey] = true;
+    }
+
     public function failNext(string $failure): void
     {
-        $allowed = ['rate_limit', 'graphql', 'timeout', 'unauthorized', 'configuration'];
+        $allowed = ['rate_limit', 'graphql', 'timeout', 'uncertain_timeout', 'unauthorized', 'configuration'];
 
         if (! in_array($failure, $allowed, true)) {
             throw new InvalidArgumentException("Unsupported fake Monday failure [{$failure}].");
@@ -138,14 +153,17 @@ final class FakeMondayApiClient implements MondayApiClientInterface
         $this->assertNoTokenArgument($integrationKey);
         $this->maybeThrowConfiguredFailure();
 
+        if (isset($this->ambiguousKeys[$integrationKey])) {
+            return MondayReconciliationResult::ambiguous(2, $integrationKey);
+        }
+
         $existing = $this->itemsByIntegrationKey[$integrationKey] ?? null;
 
         if ($existing === null || $existing->boardId !== $boardId) {
-            return new MondayReconciliationResult(found: false);
+            return MondayReconciliationResult::none($integrationKey);
         }
 
-        return new MondayReconciliationResult(
-            found: true,
+        return MondayReconciliationResult::one(
             itemId: $existing->itemId,
             boardId: $existing->boardId,
             itemUrl: $existing->itemUrl,
@@ -187,9 +205,10 @@ final class FakeMondayApiClient implements MondayApiClientInterface
         $this->nextFailure = null;
 
         match ($failure) {
-            'rate_limit' => throw MondayApiClientException::rateLimited(),
+            'rate_limit' => throw MondayApiClientException::rateLimited(retryAfterSeconds: 30),
             'graphql' => throw MondayApiClientException::graphqlError(),
-            'timeout' => throw MondayApiClientException::timeout(),
+            'timeout' => throw MondayApiClientException::timeout(uncertain: false),
+            'uncertain_timeout' => throw MondayApiClientException::timeout(uncertain: true),
             'unauthorized' => throw MondayApiClientException::unauthorized(),
             'configuration' => throw MondayApiClientException::configuration(),
             default => throw new InvalidArgumentException("Unsupported fake Monday failure [{$failure}]."),

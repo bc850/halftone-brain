@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'monday' => [
+        'api_url' => env('MONDAY_API_URL', 'https://api.monday.com/v2'),
+        'api_version' => env('MONDAY_API_VERSION', '2026-07'),
+        'personal_token' => env('MONDAY_PERSONAL_TOKEN'),
+        'connect_timeout' => (int) env('MONDAY_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('MONDAY_TIMEOUT', 20),
+        'max_response_bytes' => (int) env('MONDAY_MAX_RESPONSE_BYTES', 1048576),
+    ],
+
 ];

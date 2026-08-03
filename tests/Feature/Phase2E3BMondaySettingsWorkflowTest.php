@@ -23,12 +23,14 @@ use App\Support\Integrations\Monday\MondayApiClientInterface;
 use App\Support\Integrations\Monday\MondayApiVersion;
 use App\Support\Integrations\Monday\MondayConsumerKeys;
 use App\Support\Integrations\Monday\MondayOrganizationSettingsService;
+use App\Support\Integrations\Monday\UnavailableMondayApiClient;
 use App\Support\Integrations\Outbox\IntegrationConsumerRegistry;
 use App\Support\Quotes\Acceptance\QuoteAcceptanceAtomicityContract;
 use App\Support\Tenancy\PermissionResolver;
 use App\Support\Tenancy\TenantContext;
 use Database\Factories\OrganizationIntegrationSettingFactory;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\Phase2E3CHelpers;
 
 beforeEach(function (): void {
     $this->withoutVite();
@@ -108,6 +110,7 @@ function phase2e3bBindFakeClient(?FakeMondayApiClient $client = null): FakeMonda
     ));
 
     app()->instance(MondayApiClientInterface::class, $fake);
+    Phase2E3CHelpers::bindTestCredentials();
 
     return $fake;
 }
@@ -450,7 +453,8 @@ test('phase 2e3b runtime client not configured fails safely without http', funct
     Http::fake();
     $ctx = createTenantUser('owner');
 
-    expect(app()->bound(MondayApiClientInterface::class))->toBeFalse();
+    expect(app()->bound(MondayApiClientInterface::class))->toBeTrue()
+        ->and(app(MondayApiClientInterface::class))->toBeInstanceOf(UnavailableMondayApiClient::class);
 
     $this->actingAs($ctx['user'])
         ->post(route('org.integrations.settings.monday.store', $ctx['organization']), phase2e3bValidPayload())
@@ -555,6 +559,7 @@ test('phase 2e3b fake client validation failure modes create no items', function
     }
 
     app()->instance(MondayApiClientInterface::class, $fake);
+    Phase2E3CHelpers::bindTestCredentials();
 
     $this->actingAs($ctx['user'])
         ->post(route('org.integrations.settings.monday.store', $ctx['organization']), $payload)
@@ -662,7 +667,8 @@ test('phase 2e3b monday consumer remains unregistered and no outbox delivery or 
         ->and(IntegrationProviderReceipt::query()->count())->toBe(0)
         ->and(IntegrationOutboxDeliveryStatus::cases())->not->toBeEmpty()
         ->and(Http::recorded())->toHaveCount(0)
-        ->and(app()->bound(MondayApiClientInterface::class))->toBeTrue(); // bound only in this test
+        ->and(app()->bound(MondayApiClientInterface::class))->toBeTrue()
+        ->and(app(MondayApiClientInterface::class))->toBeInstanceOf(FakeMondayApiClient::class);
 });
 
 test('phase 2e3b service requires tenant context', function () {

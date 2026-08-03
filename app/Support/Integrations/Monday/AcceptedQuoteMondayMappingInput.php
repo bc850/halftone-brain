@@ -5,7 +5,7 @@ namespace App\Support\Integrations\Monday;
 use InvalidArgumentException;
 
 /**
- * Accepted-quote → Monday mapping input contract (no production mapper yet).
+ * Accepted-quote → Monday mapping input contract.
  *
  * Distinguishes immutable identifiers, customer-safe snapshot fields, integration
  * configuration references, and the internal authenticated Halftone URL.
